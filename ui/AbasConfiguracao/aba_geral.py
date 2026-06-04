@@ -1,0 +1,209 @@
+import tkinter as tk
+from enum import Enum
+from tkinter import ttk
+
+from infrastructure.serial_port import listar_portas
+from services.recipe_service import ReceitaService
+from services.settings_service import SettingsService
+from ui.Avisos.mensagem import mostrar as mostrar_mensagem
+from ui.Theme import theme as t
+
+
+class Baud(Enum):
+    B115200 = 115200
+    B9600 = 9600
+    B19200 = 19200
+    B38400 = 38400
+    B57600 = 57600
+    B230400 = 230400
+    B460800 = 460800
+    B921600 = 921600
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+_FONTE_COMBO = (t.FONTE_NORMAL[0], 16)
+_MAX_ITENS_VISIVEIS = 5
+
+
+class AbaGeral:
+    def __init__(self, janela, aplicacao, parent: tk.Frame, *, ao_fechar_janela):
+        self.janela = janela
+        self.aplicacao = aplicacao
+        self._ao_fechar_janela = ao_fechar_janela
+        self._estilo_combobox()
+        self._montar(parent)
+
+    def _estilo_combobox(self):
+        self.janela.option_add("*TCombobox*Listbox.font", _FONTE_COMBO)
+
+        estilo = ttk.Style(self.janela)
+        estilo.configure(
+            "Config.TCombobox",
+            font=_FONTE_COMBO,
+            padding=(12, 14),
+            fieldbackground=t.COR_BRANCO,
+            background=t.COR_BRANCO,
+            foreground=t.COR_AZUL_MARINHO,
+            arrowcolor=t.COR_AZUL_MARINHO,
+            borderwidth=0,
+            relief="flat",
+            arrowsize=20,
+        )
+        estilo.map(
+            "Config.TCombobox",
+            fieldbackground=[("readonly", t.COR_BRANCO)],
+            selectbackground=[("readonly", t.COR_BRANCO)],
+            selectforeground=[("readonly", t.COR_AZUL_MARINHO)],
+            bordercolor=[("readonly", t.COR_BRANCO)],
+        )
+
+    def _montar(self, parent: tk.Frame):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+
+        painel = tk.Frame(parent, bg=t.COR_BRANCO)
+        painel.grid(row=0, column=0, sticky="nsew")
+        painel.grid_columnconfigure(0, weight=1)
+        painel.grid_rowconfigure(0, weight=1)
+
+        centro = tk.Frame(painel, bg=t.COR_BRANCO)
+        centro.grid(row=0, column=0, sticky="nsew")
+        centro.grid_columnconfigure(0, weight=1)
+        centro.grid_rowconfigure(0, weight=1)
+        centro.grid_rowconfigure(2, weight=1)
+
+        form = tk.Frame(centro, bg=t.COR_BRANCO)
+        form.grid(row=1, column=0, sticky="ew", padx=80)
+
+        self._portas(form)
+        self._baud(form)
+        self._receitas(form)
+
+    def _rolagem_combo(self, combo):
+        def ajustar():
+            if not combo.winfo_exists():
+                return
+            try:
+                popdown = combo.tk.call("ttk::combobox::PopdownWindow", combo)
+            except tk.TclError:
+                return
+            if not popdown:
+                return
+
+            caminho = str(popdown)
+            if not caminho.startswith("."):
+                caminho = f"{combo._w}.{caminho}"
+            listbox = f"{caminho}.f.l"
+            if not combo.tk.call("winfo", "exists", listbox):
+                return
+
+            itens = combo.cget("values")
+            if isinstance(itens, str):
+                itens = combo.tk.splitlist(itens)
+            total = len(itens)
+            visiveis = min(_MAX_ITENS_VISIVEIS, max(total, 1))
+            try:
+                combo.tk.call(
+                    listbox,
+                    "configure",
+                    "-height",
+                    visiveis,
+                    "-font",
+                    _FONTE_COMBO,
+                )
+            except tk.TclError:
+                pass
+
+        def ao_abrir():
+            if combo.winfo_exists():
+                combo.after_idle(ajustar)
+
+        combo.configure(postcommand=ao_abrir)
+
+    def _combo_campo(self, parent, rotulo, valores, valor_atual, *, margem_superior=0):
+        tk.Label(
+            parent,
+            text=rotulo,
+            font=t.FONTE_BOLD,
+            bg=t.COR_BRANCO,
+            fg=t.COR_AZUL_MARINHO,
+        ).pack(anchor="w", pady=(margem_superior, 6))
+
+        combo = ttk.Combobox(
+            parent,
+            state="readonly",
+            values=valores,
+            style="Config.TCombobox",
+        )
+        combo.pack(fill="x", pady=(0, 20))
+
+        texto = str(valor_atual) if valor_atual else ""
+        if texto in valores:
+            combo.set(texto)
+        elif valores:
+            combo.set(valores[0])
+
+        self._rolagem_combo(combo)
+        return combo
+
+    def _portas(self, parent):
+        self.combo_porta = self._combo_campo(
+            parent, "Porta COM", listar_portas(), "",
+        )
+
+    def _baud(self, parent):
+        valores = [str(b) for b in Baud]
+        self.combo_baud = self._combo_campo(
+            parent, "Baud rate", valores, "",
+        )
+
+    def _receitas(self, parent):
+        receitas = ReceitaService("", []).carregar_receitas()
+        nomes = [receita.title for receita in receitas]
+        self.combo_receita = self._combo_campo(
+            parent,
+            "Receitas",
+            nomes,
+            "",
+            margem_superior=8,
+        )
+
+    def atualizar_receitas(self) -> None:
+        receitas = ReceitaService("", []).carregar_receitas()
+        nomes = [receita.title for receita in receitas]
+        atual = self.combo_receita.get()
+        self.combo_receita.configure(values=nomes)
+        if atual in nomes:
+            self.combo_receita.set(atual)
+        elif nomes:
+            self.combo_receita.set(nomes[0])
+        else:
+            self.combo_receita.set("")
+
+    def limpar_combos(self):
+        for combo in (self.combo_porta, self.combo_baud, self.combo_receita):
+            try:
+                if combo.winfo_exists():
+                    combo.configure(postcommand="")
+            except tk.TclError:
+                pass
+
+    def salvar(self):
+        baud = int(self.combo_baud.get())
+        erro = SettingsService(
+            self.combo_porta.get(),
+            baud,
+            self.combo_receita.get(),
+        ).salvar_configuracao()
+        if erro:
+            mostrar_mensagem(self.janela, "", erro, tipo="aviso")
+            return
+        self.aplicacao.janela_principal.aplicar_configuracao(
+            self.combo_porta.get(),
+            baud,
+            self.combo_receita.get(),
+        )
+        mostrar_mensagem(self.janela, "", "Salvo com sucesso.")
+        self._ao_fechar_janela()
