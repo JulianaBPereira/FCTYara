@@ -4,11 +4,11 @@ from ui.branding import aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 from ui.AbasConfiguracao.aba_geral import AbaGeral
 from ui.AbasConfiguracao.aba_rastreio import AbaRastreio
-from ui.AbasConfiguracao.estilo_notebook import PainelAbasConfig
+from ui.AbasConfiguracao.navegacao_abas import NavegacaoAbas
 
 
 class JanelaConfiguracao(tk.Toplevel):
-    # Janela de configuração: abas Geral e Rastreio log.
+    # Janela de configuração: abas Geral e Rastreio.
 
     def __init__(self, aplicacao):
         super().__init__(aplicacao.raiz)
@@ -22,7 +22,7 @@ class JanelaConfiguracao(tk.Toplevel):
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
-        self._painel_abas: PainelAbasConfig | None = None
+        self._navegacao: NavegacaoAbas | None = None
         self._rodape: tk.Frame | None = None
         self._montar_interface()
         centralizar_janela(self, aplicacao.raiz)
@@ -32,19 +32,20 @@ class JanelaConfiguracao(tk.Toplevel):
         p = tk.Frame(self, bg=t.COR_BRANCO)
         p.pack(fill="both", expand=True, padx=20, pady=16)
 
-        # Rodapé fixo embaixo (evita cortar Cancelar/Salvar em telas menores, ex. Raspberry).
         self._rodape = tk.Frame(p, bg=t.COR_BRANCO)
         self._rodape.pack(side="bottom", fill="x", pady=(12, 0))
         self._montar_rodape_geral()
 
-        self._painel_abas = PainelAbasConfig(p, on_trocar=self._ao_trocar_aba)
-        self._painel_abas.widget.pack(fill="both", expand=True)
+        self._navegacao = NavegacaoAbas(p, on_trocar=self._ao_trocar_aba)
 
-        frame_geral = self._painel_abas.adicionar_aba("Geral", self._montar_aba_geral)
-        self._painel_abas.adicionar_aba("Rastreio", lambda parent: AbaRastreio(self, parent))
-
-        frame_geral.grid_columnconfigure(0, weight=1)
-        frame_geral.grid_rowconfigure(0, weight=1)
+        self._navegacao.adicionar_aba(
+            "Geral",
+            lambda parent: self._montar_aba_geral(parent),
+        )
+        self._navegacao.adicionar_aba(
+            "Rastreio",
+            lambda parent: AbaRastreio(self, parent),
+        )
 
         self._ao_trocar_aba(0)
 

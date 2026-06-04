@@ -125,16 +125,8 @@ class AbaRastreio:
 
     def _montar(self, parent: tk.Frame):
         self._painel_aba = parent
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(0, weight=1)
-
-        centro = tk.Frame(parent, bg=t.COR_BRANCO)
-        centro.grid(row=0, column=0, sticky="nsew")
-        centro.grid_columnconfigure(0, weight=1)
-        centro.grid_rowconfigure(1, weight=1)
-
-        form = tk.Frame(centro, bg=t.COR_BRANCO)
-        form.grid(row=0, column=0, sticky="new", padx=80, pady=(20, 0))
+        form = tk.Frame(parent, bg=t.COR_BRANCO)
+        form.pack(fill="x", padx=40, pady=16)
         form.grid_columnconfigure(0, weight=1)
 
         tk.Label(

@@ -23,7 +23,7 @@ class Baud(Enum):
         return str(self.value)
 
 
-_FONTE_COMBO = (t.FONTE_NORMAL[0], 16)
+_FONTE_COMBO = t.FONTE_NORMAL
 _MAX_ITENS_VISIVEIS = 5
 
 
@@ -42,14 +42,14 @@ class AbaGeral:
         estilo.configure(
             "Config.TCombobox",
             font=_FONTE_COMBO,
-            padding=(12, 14),
+            padding=(8, 6),
             fieldbackground=t.COR_BRANCO,
             background=t.COR_BRANCO,
             foreground=t.COR_AZUL_MARINHO,
             arrowcolor=t.COR_AZUL_MARINHO,
-            borderwidth=0,
-            relief="flat",
-            arrowsize=20,
+            borderwidth=1,
+            relief="solid",
+            arrowsize=16,
         )
         estilo.map(
             "Config.TCombobox",
@@ -61,22 +61,8 @@ class AbaGeral:
 
     def _montar(self, parent: tk.Frame):
         self._painel_aba = parent
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(0, weight=1)
-
-        painel = tk.Frame(parent, bg=t.COR_BRANCO)
-        painel.grid(row=0, column=0, sticky="nsew")
-        painel.grid_columnconfigure(0, weight=1)
-        painel.grid_rowconfigure(0, weight=1)
-
-        centro = tk.Frame(painel, bg=t.COR_BRANCO)
-        centro.grid(row=0, column=0, sticky="nsew")
-        centro.grid_columnconfigure(0, weight=1)
-        centro.grid_rowconfigure(0, weight=1)
-        centro.grid_rowconfigure(2, weight=1)
-
-        form = tk.Frame(centro, bg=t.COR_BRANCO)
-        form.grid(row=1, column=0, sticky="ew", padx=80)
+        form = tk.Frame(parent, bg=t.COR_BRANCO)
+        form.pack(fill="x", padx=40, pady=16)
 
         self._portas(form)
         self._baud(form)
