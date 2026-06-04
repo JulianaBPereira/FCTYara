@@ -16,7 +16,7 @@ class JanelaConfiguracao(tk.Toplevel):
         self.aba_geral: AbaGeral | None = None
 
         self.title("Configuração")
-        self.geometry("720x480")
+        self.geometry("720x430")
         self.resizable(True, True)
         self.minsize(680, 440)
         self.configure(bg=t.COR_BRANCO)

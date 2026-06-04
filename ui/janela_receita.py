@@ -19,7 +19,7 @@ class JanelaReceita(tk.Toplevel):
         self.linha_selecionada = None
 
         self.title("Criar Receita")
-        self.geometry("720x480")
+        self.geometry("720x430")
         self.resizable(True, True)
         self.minsize(680, 440)
         self.configure(bg=t.COR_BRANCO)
