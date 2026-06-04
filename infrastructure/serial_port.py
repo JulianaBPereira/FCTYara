@@ -1,3 +1,5 @@
+import time
+
 import serial
 import serial.tools.list_ports
 
@@ -25,29 +27,29 @@ def conectar(porta: str, baud: int) -> bool:
         _conexao = None
         return False
 
-
 def fechar() -> None:
     global _conexao
     if _conexao and _conexao.is_open:
         _conexao.close()
     _conexao = None
 
-
 def obter_conexao() -> serial.Serial | None:
     return _conexao
 
-
 def enviar_comando(comando: str) -> str:
     conexao = obter_conexao()
+
     if conexao is None or not conexao.is_open:
         return "ERRO: porta serial não conectada"
-    
+
     try:
-        conexao.reset_input_buffer()
         conexao.write(f"{comando}\n".encode())
+
+        time.sleep(0.7)  # mais seguro
+
         resposta = conexao.readline().decode(errors="replace").strip()
+
         return resposta
-    except serial.SerialTimeoutException:
-        return "TIMEOUT"
+
     except Exception as ex:
         return f"ERRO: {ex}"
