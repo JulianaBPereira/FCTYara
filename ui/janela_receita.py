@@ -3,7 +3,7 @@ from tkinter import ttk
 
 from domain.models import Step
 from services.recipe_service import ReceitaService
-from ui.branding import aplicar_icone
+from ui.branding import aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 
@@ -19,14 +19,14 @@ class JanelaReceita(tk.Toplevel):
         self.linha_selecionada = None
 
         self.title("Criar Receita")
-        self.geometry("720x430")
+        self.geometry("720x480")
         self.resizable(True, True)
-        self.minsize(680, 440)
+        self.minsize(680, 420)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
         self._montar_interface()
-        self._centralizar(aplicacao.raiz)
+        centralizar_janela(self, aplicacao.raiz)
         self.protocol("WM_DELETE_WINDOW", self._fechar_janela)
 
         if nome_editar:
@@ -297,12 +297,6 @@ class JanelaReceita(tk.Toplevel):
         self.linhas.remove(self.linha_selecionada)
         self.linha_selecionada = None
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _centralizar(self, ref):
-        self.update_idletasks()
-        px = ref.winfo_x() + ref.winfo_width() // 2 - self.winfo_width() // 2
-        py = ref.winfo_y() + ref.winfo_height() // 2 - self.winfo_height() // 2
-        self.geometry(f"+{px}+{py}")
 
     def _fechar_janela(self):
         self.aplicacao.ao_fechar_receita()

@@ -24,6 +24,26 @@ def aplicar_icone(janela: tk.Misc) -> None:
             janela._icone_janela = foto  # noqa: SLF001 — manter referência viva
 
 
+def centralizar_janela(janela: tk.Misc, referencia: tk.Misc) -> None:
+    """Centraliza em relação à janela de referência, sem sair da área visível."""
+    janela.update_idletasks()
+    px = (
+        referencia.winfo_rootx()
+        + referencia.winfo_width() // 2
+        - janela.winfo_width() // 2
+    )
+    py = (
+        referencia.winfo_rooty()
+        + referencia.winfo_height() // 2
+        - janela.winfo_height() // 2
+    )
+    largura_tela = janela.winfo_screenwidth()
+    altura_tela = janela.winfo_screenheight()
+    px = max(0, min(px, largura_tela - janela.winfo_width()))
+    py = max(0, min(py, altura_tela - janela.winfo_height()))
+    janela.geometry(f"+{px}+{py}")
+
+
 def configurar_app_id() -> None:
     """Agrupa janelas do app na barra de tarefas do Windows (ícone correto)."""
     if sys.platform != "win32":
