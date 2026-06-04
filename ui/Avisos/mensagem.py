@@ -6,12 +6,19 @@ from ui.Theme import theme as t
 
 def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
     """Diálogo modal sem barra do sistema; a janela pai mantém decoração normal."""
+    janela_pai = parent.winfo_toplevel()
+
     dlg = tk.Toplevel(parent)
     dlg.withdraw()
     aplicar_icone(dlg)
     dlg.configure(bg=t.COR_PRIMARIA)
     dlg.resizable(False, False)
     dlg.minsize(420, 160)
+    # overrideredirect e transient definidos antes da centralização para que o
+    # cálculo de posição já reflita a janela sem barra de título, evitando que
+    # o window manager do Linux reposicione a janela após o deiconify.
+    dlg.overrideredirect(True)
+    dlg.transient(janela_pai)
 
     moldura = tk.Frame(dlg, bg=t.COR_PRIMARIA, padx=1, pady=1)
     moldura.pack(fill="both", expand=True)
@@ -58,10 +65,7 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
 
     centralizar_dialogo(dlg, parent)
 
-    janela_pai = parent.winfo_toplevel()
-    dlg.overrideredirect(True)
     dlg.deiconify()
-    dlg.transient(janela_pai)
     dlg.lift(janela_pai)
     dlg.grab_set()
     dlg.focus_force()

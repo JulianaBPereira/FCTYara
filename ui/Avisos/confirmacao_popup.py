@@ -27,6 +27,9 @@ def perguntar(
     _ALTURA = 220
     dlg.minsize(_LARGURA, _ALTURA)
     dlg.maxsize(_LARGURA, _ALTURA)
+    # overrideredirect definido antes da centralização para que o cálculo de
+    # posição já reflita a janela sem barra de título no Linux/X11.
+    dlg.overrideredirect(True)
 
     moldura = tk.Frame(dlg, bg=t.COR_PRIMARIA, padx=1, pady=1)
     moldura.pack(fill="both", expand=True)
@@ -114,7 +117,6 @@ def perguntar(
 
     centralizar_dialogo(dlg, parent, largura=_LARGURA, altura=_ALTURA)
 
-    dlg.overrideredirect(True)
     dlg.deiconify()
     dlg.lift(parent)
     dlg.grab_set()

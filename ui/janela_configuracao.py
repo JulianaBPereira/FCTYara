@@ -44,7 +44,7 @@ class JanelaConfiguracao(tk.Toplevel):
         )
         self._navegacao.adicionar_aba(
             "Rastreio",
-            lambda parent: AbaRastreio(self, parent),
+            lambda parent: AbaRastreio(self, parent, ao_fechar_janela=self._fechar),
         )
 
         self._ao_trocar_aba(0)

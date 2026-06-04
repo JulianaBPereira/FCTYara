@@ -37,12 +37,21 @@ def _posicao_centralizada(
     ref_altura: int,
 ) -> tuple[int, int]:
     janela.update_idletasks()
-    px = ref_x + (ref_largura - janela.winfo_width()) // 2
-    py = ref_y + (ref_altura - janela.winfo_height()) // 2
+    # No Linux/X11, janelas retiradas (withdraw) retornam 1x1 antes de serem
+    # mapeadas na tela. winfo_reqwidth/height reflete o tamanho real calculado
+    # pelo gerenciador de layout, independente de a janela estar visível.
+    w = janela.winfo_width()
+    h = janela.winfo_height()
+    if w <= 1:
+        w = janela.winfo_reqwidth()
+    if h <= 1:
+        h = janela.winfo_reqheight()
+    px = ref_x + (ref_largura - w) // 2
+    py = ref_y + (ref_altura - h) // 2
     largura_tela = janela.winfo_screenwidth()
     altura_tela = janela.winfo_screenheight()
-    px = max(0, min(px, largura_tela - janela.winfo_width()))
-    py = max(0, min(py, altura_tela - janela.winfo_height()))
+    px = max(0, min(px, largura_tela - w))
+    py = max(0, min(py, altura_tela - h))
     return px, py
 
 

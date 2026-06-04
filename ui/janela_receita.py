@@ -89,6 +89,7 @@ class JanelaReceita(tk.Toplevel):
             font=t.FONTE_NORMAL, 
             relief="flat", 
             bd=0,
+            highlightthickness=0,
             bg=t.COR_BRANCO, 
             fg=t.COR_AZUL_MARINHO,
         )
@@ -235,6 +236,7 @@ class JanelaReceita(tk.Toplevel):
         frame = tk.Frame(parent, bg=t.COR_BRANCO)
         entry = tk.Entry(
             frame, font=t.FONTE_NORMAL, relief="flat", bd=0,
+            highlightthickness=0,
             bg=t.COR_BRANCO, fg=t.COR_AZUL_MARINHO, insertbackground=t.COR_AZUL_MARINHO,
             justify="center",
         )

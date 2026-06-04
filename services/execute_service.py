@@ -3,7 +3,7 @@ from infrastructure.serial_port import enviar_comando, enviar_sem_resposta, obte
 
 
 def disparar_display() -> bool:
-    """Envia comando 4; o hardware não retorna resposta — o operador confirma na UI."""
+    # Envia comando 4; o hardware não retorna resposta — o operador confirma na UI.
     if obter_conexao() is None:
         return False
     ok = enviar_sem_resposta("4")

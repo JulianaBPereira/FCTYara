@@ -25,6 +25,7 @@ class _EntradaAutocomplete:
             font=t.FONTE_NORMAL,
             relief="flat",
             bd=0,
+            highlightthickness=0,
             bg=t.COR_BRANCO,
             fg=t.COR_AZUL_MARINHO,
         )
@@ -109,8 +110,9 @@ class _EntradaAutocomplete:
 
 
 class AbaRastreio:
-    def __init__(self, janela, parent: tk.Frame):
+    def __init__(self, janela, parent: tk.Frame, *, ao_fechar_janela=None):
         self.janela = janela
+        self._ao_fechar_janela = ao_fechar_janela
         self._todas_sugestoes = sugestoes_pasta_logs()
         self.campo_pasta: _EntradaAutocomplete | None = None
         self.btn_procurar: tk.Button | None = None
@@ -208,9 +210,28 @@ class AbaRastreio:
             cursor="hand2",
         ).pack(side="left")
 
-        # ── Botão Salvar ──────────────────────────────────────────────────────
+        # ── Botões Cancelar / Salvar ──────────────────────────────────────────
+        acoes = tk.Frame(form, bg=t.COR_BRANCO)
+        acoes.grid(row=4, column=0, columnspan=2, sticky="e", pady=(20, 0))
+
         tk.Button(
-            form,
+            acoes,
+            text="Cancelar",
+            font=t.FONTE_NORMAL,
+            bg=t.COR_AZUL_MARINHO,
+            fg="white",
+            activebackground=t.COR_AZUL_MARINHO_HOVER,
+            activeforeground="white",
+            relief="flat",
+            cursor="hand2",
+            bd=0,
+            padx=14,
+            pady=6,
+            command=self._cancelar,
+        ).pack(side="left")
+
+        tk.Button(
+            acoes,
             text="Salvar",
             font=t.FONTE_NORMAL,
             bg=t.COR_AZUL_MARINHO,
@@ -223,7 +244,11 @@ class AbaRastreio:
             padx=14,
             pady=6,
             command=self._salvar,
-        ).grid(row=4, column=0, columnspan=2, sticky="e", pady=(20, 0))
+        ).pack(side="left", padx=(12, 0))
+
+    def _cancelar(self) -> None:
+        if self._ao_fechar_janela:
+            self._ao_fechar_janela()
 
     def _salvar(self) -> None:
         if not self.var_txt.get() and not self.var_excel.get():

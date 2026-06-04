@@ -23,7 +23,7 @@ class Baud(Enum):
         return str(self.value)
 
 
-_FONTE_COMBO = t.FONTE_NORMAL
+_FONTE_COMBO = (t.FONTE_NORMAL[0], 14)
 _MAX_ITENS_VISIVEIS = 5
 
 

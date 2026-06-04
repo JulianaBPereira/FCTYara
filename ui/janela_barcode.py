@@ -50,6 +50,7 @@ class JanelaBarcode(tk.Toplevel):
             font=t.FONTE_NORMAL,
             relief="flat",
             bd=0,
+            highlightthickness=0,
             bg=t.COR_BRANCO,
             fg=_COR_PLACEHOLDER,
             insertbackground=t.COR_AZUL_MARINHO,
