@@ -6,7 +6,7 @@ from tkinter import ttk
 
 from services.log_service import listar_logs
 from services.rastreio_service import pasta_logs_efetiva
-from ui.branding import aplicar_icone
+from ui.branding import GEOMETRIA_PADRAO, aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 
 _COR_BORDA = "#eef1f5"
@@ -50,21 +50,7 @@ class _PopupCalendario(tk.Toplevel):
 
         self._montar()
         self._desenhar_mes()
-        self._centralizar_na_janela(parent.winfo_toplevel())
-
-    def _centralizar_na_janela(self, janela: tk.Widget) -> None:
-        self.update_idletasks()
-        px = (
-            janela.winfo_rootx()
-            + janela.winfo_width() // 2
-            - self.winfo_width() // 2
-        )
-        py = (
-            janela.winfo_rooty()
-            + janela.winfo_height() // 2
-            - self.winfo_height() // 2
-        )
-        self.geometry(f"+{px}+{py}")
+        centralizar_janela(self, parent.winfo_toplevel())
 
     def _montar(self) -> None:
         topo = tk.Frame(self, bg=t.COR_BRANCO)
@@ -318,9 +304,9 @@ class JanelaRegistros(tk.Toplevel):
         self.aplicacao = aplicacao
 
         self.title("Registros")
-        self.geometry("720x480")
+        self.geometry(GEOMETRIA_PADRAO)
         self.resizable(True, True)
-        self.minsize(680, 440)
+        self.minsize(640, 400)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
@@ -328,7 +314,7 @@ class JanelaRegistros(tk.Toplevel):
         self._btn_abrir: tk.Button | None = None
 
         self._montar_interface()
-        self._centralizar(aplicacao.raiz)
+        centralizar_janela(self, aplicacao.raiz)
         self.protocol("WM_DELETE_WINDOW", self._fechar)
         self.after_idle(self._atualizar)
 
@@ -632,12 +618,6 @@ class JanelaRegistros(tk.Toplevel):
             os.startfile(caminho)
         except Exception:
             pass
-
-    def _centralizar(self, ref: tk.Widget) -> None:
-        self.update_idletasks()
-        px = ref.winfo_x() + ref.winfo_width() // 2 - self.winfo_width() // 2
-        py = ref.winfo_y() + ref.winfo_height() // 2 - self.winfo_height() // 2
-        self.geometry(f"+{px}+{py}")
 
     def _fechar(self) -> None:
         self.aplicacao.ao_fechar_registros()

@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from ui.branding import aplicar_icone
+from ui.branding import aplicar_icone, centralizar_dialogo
 from ui.Theme import theme as t
 
 MENSAGEM_PADRAO_POPUP = (
@@ -112,10 +112,7 @@ def perguntar(
 
     dlg.protocol("WM_DELETE_WINDOW", lambda: fechar(False))
 
-    dlg.update_idletasks()
-    x = parent.winfo_rootx() + (parent.winfo_width() - _LARGURA) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - _ALTURA) // 2
-    dlg.geometry(f"{_LARGURA}x{_ALTURA}+{x}+{y}")
+    centralizar_dialogo(dlg, parent, largura=_LARGURA, altura=_ALTURA)
 
     dlg.overrideredirect(True)
     dlg.deiconify()

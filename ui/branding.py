@@ -24,24 +24,75 @@ def aplicar_icone(janela: tk.Misc) -> None:
             janela._icone_janela = foto  # noqa: SLF001 — manter referência viva
 
 
-def centralizar_janela(janela: tk.Misc, referencia: tk.Misc) -> None:
-    """Centraliza em relação à janela de referência, sem sair da área visível."""
+LARGURA_PADRAO = 1024
+ALTURA_PADRAO = 600
+GEOMETRIA_PADRAO = f"{LARGURA_PADRAO}x{ALTURA_PADRAO}"
+
+
+def _posicao_centralizada(
+    janela: tk.Misc,
+    ref_x: int,
+    ref_y: int,
+    ref_largura: int,
+    ref_altura: int,
+) -> tuple[int, int]:
     janela.update_idletasks()
-    px = (
-        referencia.winfo_rootx()
-        + referencia.winfo_width() // 2
-        - janela.winfo_width() // 2
-    )
-    py = (
-        referencia.winfo_rooty()
-        + referencia.winfo_height() // 2
-        - janela.winfo_height() // 2
-    )
+    px = ref_x + (ref_largura - janela.winfo_width()) // 2
+    py = ref_y + (ref_altura - janela.winfo_height()) // 2
     largura_tela = janela.winfo_screenwidth()
     altura_tela = janela.winfo_screenheight()
     px = max(0, min(px, largura_tela - janela.winfo_width()))
     py = max(0, min(py, altura_tela - janela.winfo_height()))
+    return px, py
+
+
+def centralizar_na_tela(janela: tk.Misc) -> None:
+    """Centraliza a janela no monitor, sem sair da área visível."""
+    px, py = _posicao_centralizada(
+        janela,
+        0,
+        0,
+        janela.winfo_screenwidth(),
+        janela.winfo_screenheight(),
+    )
     janela.geometry(f"+{px}+{py}")
+
+
+def centralizar_janela(
+    janela: tk.Misc,
+    referencia: tk.Misc,
+    *,
+    largura: int | None = None,
+    altura: int | None = None,
+) -> None:
+    """Centraliza em relação à janela de referência, sem sair da área visível."""
+    if largura is not None and altura is not None:
+        janela.geometry(f"{largura}x{altura}")
+    referencia.update_idletasks()
+    px, py = _posicao_centralizada(
+        janela,
+        referencia.winfo_rootx(),
+        referencia.winfo_rooty(),
+        referencia.winfo_width(),
+        referencia.winfo_height(),
+    )
+    janela.geometry(f"+{px}+{py}")
+
+
+def centralizar_dialogo(
+    dialogo: tk.Misc,
+    parent: tk.Misc,
+    *,
+    largura: int | None = None,
+    altura: int | None = None,
+) -> None:
+    """Centraliza aviso ou diálogo sobre a janela principal da aplicação."""
+    centralizar_janela(
+        dialogo,
+        parent.winfo_toplevel(),
+        largura=largura,
+        altura=altura,
+    )
 
 
 def configurar_app_id() -> None:

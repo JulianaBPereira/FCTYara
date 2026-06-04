@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from ui.branding import aplicar_icone
+from ui.branding import aplicar_icone, centralizar_dialogo
 from ui.Theme import theme as t
 
 
@@ -56,10 +56,7 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
     dlg.bind("<Escape>", lambda _e: fechar())
     dlg.protocol("WM_DELETE_WINDOW", fechar)
 
-    dlg.update_idletasks()
-    x = parent.winfo_rootx() + (parent.winfo_width() - dlg.winfo_width()) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - dlg.winfo_height()) // 2
-    dlg.geometry(f"+{x}+{y}")
+    centralizar_dialogo(dlg, parent)
 
     janela_pai = parent.winfo_toplevel()
     dlg.overrideredirect(True)

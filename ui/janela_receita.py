@@ -3,7 +3,7 @@ from tkinter import ttk
 
 from domain.models import Step
 from services.recipe_service import ReceitaService
-from ui.branding import aplicar_icone, centralizar_janela
+from ui.branding import GEOMETRIA_PADRAO, aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 
@@ -19,9 +19,9 @@ class JanelaReceita(tk.Toplevel):
         self.linha_selecionada = None
 
         self.title("Criar Receita")
-        self.geometry("720x480")
+        self.geometry(GEOMETRIA_PADRAO)
         self.resizable(True, True)
-        self.minsize(680, 420)
+        self.minsize(640, 400)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 

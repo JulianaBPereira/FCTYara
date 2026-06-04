@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from ui.branding import aplicar_icone
+from ui.branding import aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 
 _PLACEHOLDER = "Scannei a peça"
@@ -23,7 +23,7 @@ class JanelaBarcode(tk.Toplevel):
         aplicar_icone(self)
 
         self._montar_interface()
-        self._centralizar(aplicacao.raiz)
+        centralizar_janela(self, aplicacao.raiz)
         self.protocol("WM_DELETE_WINDOW", self._fechar)
 
         self.after(50, self.focar_campo)
@@ -87,16 +87,11 @@ class JanelaBarcode(tk.Toplevel):
         codigo = self.valor()
         if not codigo:
             return "break"
-        if self._on_ler:
-            self._on_ler(codigo)
+        on_ler = self._on_ler
         self._fechar()
+        if on_ler:
+            on_ler(codigo)
         return "break"
-
-    def _centralizar(self, ref):
-        self.update_idletasks()
-        px = ref.winfo_x() + ref.winfo_width() // 2 - self.winfo_width() // 2
-        py = ref.winfo_y() + ref.winfo_height() // 2 - self.winfo_height() // 2
-        self.geometry(f"+{px}+{py}")
 
     def _fechar(self):
         self.aplicacao.ao_fechar_barcode()

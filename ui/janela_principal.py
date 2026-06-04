@@ -4,7 +4,7 @@ from tkinter import ttk
 from domain.models import Recipe, Step
 from infrastructure.serial_port import conectar, enviar_comando
 from services.barcode_service import BarcodeService
-from services.execute_service import executar
+from services.execute_service import disparar_display, executar
 from services.log_service import salvar_log
 from services.rastreio_service import carregar_config_rastreio, pasta_logs_efetiva
 from services.recipe_service import ReceitaService
@@ -13,7 +13,12 @@ from ui.Avisos.confirmacao_popup import perguntar as perguntar_popup
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
 from ui.barra_menu import criar_menu_principal
-from ui.branding import aplicar_icone, configurar_app_id
+from ui.branding import (
+    GEOMETRIA_PADRAO,
+    aplicar_icone,
+    centralizar_na_tela,
+    configurar_app_id,
+)
 
 
 class JanelaPrincipal(tk.Tk):
@@ -35,7 +40,7 @@ class JanelaPrincipal(tk.Tk):
 
         configurar_app_id()
         self.title("FTCYara v1.0.0")
-        self.geometry("800x480")
+        self.geometry(GEOMETRIA_PADRAO)
         self.minsize(640, 400)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
@@ -50,6 +55,7 @@ class JanelaPrincipal(tk.Tk):
         self._labels_status: list[tk.Label] = []
 
         self._montar_interface()
+        centralizar_na_tela(self)
         self._restaurar_configuracao()
 
     def _restaurar_configuracao(self) -> None:
@@ -153,6 +159,9 @@ class JanelaPrincipal(tk.Tk):
         if valor:
             return valor
         return (passo_popup.expectedValue or "").strip()
+
+    def _eh_passo_display(self, passo: Step) -> bool:
+        return passo.name.strip().upper() in ("CHECAR DISPLAY", "DISPLAY")
 
     def aplicar_configuracao(self, porta: str, baud: int, receita: str) -> None:
         conectado = conectar(porta, baud)
@@ -561,6 +570,29 @@ class JanelaPrincipal(tk.Tk):
     def _executar_lote_serial(self) -> None:
         while self._indice_passo < len(self._receita_ativa.steps):
             passo = self._receita_ativa.steps[self._indice_passo]
+            if self._eh_passo_display(passo):
+                if not disparar_display():
+                    self._atualizar_linha_teste(
+                        self._indice_passo,
+                        "ERRO: porta serial não conectada",
+                        t.STATUS_FAIL,
+                    )
+                    self._salvar_log()
+                    return
+                valor_display = self._valor_para_popup(passo)
+                aprovado = perguntar_popup(self, "", valor_display)
+                status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
+                self._atualizar_linha_teste(
+                    self._indice_passo,
+                    valor_display or ("Sim" if aprovado else "Não"),
+                    status,
+                )
+                self._indice_passo += 1
+                if not aprovado:
+                    enviar_comando("2")
+                    self._salvar_log()
+                    return
+                continue
             if passo.type == "Pop-up":
                 valor_display = self._valor_para_popup(passo)
                 aprovado = perguntar_popup(

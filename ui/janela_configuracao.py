@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from ui.branding import aplicar_icone, centralizar_janela
+from ui.branding import GEOMETRIA_PADRAO, aplicar_icone, centralizar_janela
 from ui.Theme import theme as t
 from ui.AbasConfiguracao.aba_geral import AbaGeral
 from ui.AbasConfiguracao.aba_rastreio import AbaRastreio
@@ -16,9 +16,9 @@ class JanelaConfiguracao(tk.Toplevel):
         self.aba_geral: AbaGeral | None = None
 
         self.title("Configuração")
-        self.geometry("720x480")
+        self.geometry(GEOMETRIA_PADRAO)
         self.resizable(True, True)
-        self.minsize(680, 420)
+        self.minsize(640, 400)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
