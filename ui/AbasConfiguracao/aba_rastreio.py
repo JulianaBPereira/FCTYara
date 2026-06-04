@@ -124,6 +124,7 @@ class AbaRastreio:
         self._montar(parent)
 
     def _montar(self, parent: tk.Frame):
+        self._painel_aba = parent
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
 
@@ -235,7 +236,10 @@ class AbaRastreio:
     def _salvar(self) -> None:
         if not self.var_txt.get() and not self.var_excel.get():
             mostrar_mensagem(
-                self.janela, "", "Selecione ao menos um formato de log.", tipo="aviso"
+                self._painel_aba,
+                "",
+                "Selecione ao menos um formato de log.",
+                tipo="aviso",
             )
             return
         salvar_config_rastreio(
@@ -243,7 +247,7 @@ class AbaRastreio:
             formato_txt=self.var_txt.get(),
             formato_excel=self.var_excel.get(),
         )
-        mostrar_mensagem(self.janela, "", "Configuração de rastreio salva.")
+        mostrar_mensagem(self._painel_aba, "", "Configuração de rastreio salva.")
 
     def _procurar_pasta(self):
         inicial = self.pasta_logs.get().strip() or str(pasta_logs_padrao().parent)

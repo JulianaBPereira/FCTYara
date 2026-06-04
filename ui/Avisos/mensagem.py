@@ -61,9 +61,11 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
     y = parent.winfo_rooty() + (parent.winfo_height() - dlg.winfo_height()) // 2
     dlg.geometry(f"+{x}+{y}")
 
+    janela_pai = parent.winfo_toplevel()
     dlg.overrideredirect(True)
     dlg.deiconify()
-    dlg.lift(parent)
+    dlg.transient(janela_pai)
+    dlg.lift(janela_pai)
     dlg.grab_set()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    janela_pai.wait_window(dlg)

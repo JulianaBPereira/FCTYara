@@ -54,8 +54,6 @@ class SettingsService:
 
 
 def carregar_configuracao() -> Settings | None:
-    # Lê a configuração persistida em settings.json, se existir.
-
     arquivo = _pasta_configuracao() / "settings.json"
 
     if not arquivo.exists():
@@ -63,16 +61,18 @@ def carregar_configuracao() -> Settings | None:
     
     with open(arquivo, encoding="utf-8") as f:
         data = json.load(f)
-        
+
+    baud = data.get("channelABaud")
+    
     return Settings(
-        channelAPort=data.get("channelAPort", ""),
-        channelABaud=int(data.get("channelABaud", 0)),
-        channelARecipe=data.get("channelARecipe", ""),
+        channelAPort=data.get("channelAPort") or "",
+        channelABaud=int(baud) if baud is not None else 0,
+        channelARecipe=data.get("channelARecipe") or "",
     )
 
 # Raspberry: se /var/app-data não existir ou faltar permissão, criar uma vez com:
 # sudo mkdir -p /var/app-data/FCTYara
-# sudo chown -R pi:pi /var/app-data
+# sudo chown -R delta:delta /var/app-data
 # chmod -R 750 /var/app-data
 # Windows (teste): salva em Desktop/FCTYara/settings.json
 

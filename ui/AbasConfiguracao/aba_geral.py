@@ -60,6 +60,7 @@ class AbaGeral:
         )
 
     def _montar(self, parent: tk.Frame):
+        self._painel_aba = parent
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
 
@@ -198,12 +199,12 @@ class AbaGeral:
             self.combo_receita.get(),
         ).salvar_configuracao()
         if erro:
-            mostrar_mensagem(self.janela, "", erro, tipo="aviso")
+            mostrar_mensagem(self._painel_aba, "", erro, tipo="aviso")
             return
         self.aplicacao.janela_principal.aplicar_configuracao(
             self.combo_porta.get(),
             baud,
             self.combo_receita.get(),
         )
-        mostrar_mensagem(self.janela, "", "Salvo com sucesso.")
+        mostrar_mensagem(self._painel_aba, "", "Salvo com sucesso.")
         self._ao_fechar_janela()
