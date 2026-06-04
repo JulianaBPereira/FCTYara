@@ -1,8 +1,13 @@
 from dataclasses import asdict
 from pathlib import Path
 import json
+import sys
 
 from domain.models import Recipe, Step
+
+
+def _pasta_receitas() -> Path:
+    return Path.home() / "Desktop" / "Recipes"
 
 # A função salvar_receita conta com uma validação inicial de cadastro, que confere se titulo
 # e passos estão preenchidos, e se o titulo é único.
@@ -23,7 +28,7 @@ class ReceitaService:
             if not self.steps:
                 return "Pelo menos um passo é obrigatório."
 
-            pasta = Path.home() / "Desktop" / "Recipes"
+            pasta = _pasta_receitas()
             pasta.mkdir(parents=True, exist_ok=True)
 
             arquivo = pasta / f"{titulo}.json"
@@ -56,16 +61,59 @@ class ReceitaService:
         except Exception as e:
             print(f"Erro ao salvar o arquivo JSON: {e}")
 
-    def carregar_receitas(self):
-        pasta = Path.home() / "Desktop" / "Recipes"
+    def carregar_receitas(self) -> list[Recipe]:
+        pasta = _pasta_receitas()
         if not pasta.exists():
             return []
-        receitas = []
-        for arquivo in pasta.glob("*.json"):
-            with open(arquivo, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                passos = [Step(**step) for step in data.get("steps", [])]
-                receita = Recipe(title=data.get("title", ""), steps=passos)
+
+        receitas: list[Recipe] = []
+        for arquivo in sorted(pasta.glob("*.json")):
+            receita = _ler_arquivo_receita(arquivo)
+            if receita is not None:
                 receitas.append(receita)
         return receitas
+
+
+def _ler_arquivo_receita(arquivo: Path) -> Recipe | None:
+    try:
+        with open(arquivo, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(
+            f"[FCTYara] Receita ignorada (JSON inválido): {arquivo.name} — {e}",
+            file=sys.stderr,
+        )
+        return None
+    except OSError as e:
+        print(
+            f"[FCTYara] Receita ignorada (erro ao ler): {arquivo.name} — {e}",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(data, dict):
+        print(
+            f"[FCTYara] Receita ignorada (formato inválido): {arquivo.name}",
+            file=sys.stderr,
+        )
+        return None
+
+    titulo = str(data.get("title") or arquivo.stem).strip()
+    passos_brutos = data.get("steps", [])
+    if not isinstance(passos_brutos, list):
+        passos_brutos = []
+
+    passos: list[Step] = []
+    for i, item in enumerate(passos_brutos):
+        if not isinstance(item, dict):
+            continue
+        try:
+            passos.append(Step(**item))
+        except TypeError as e:
+            print(
+                f"[FCTYara] Passo {i + 1} ignorado em {arquivo.name}: {e}",
+                file=sys.stderr,
+            )
+
+    return Recipe(title=titulo, steps=passos)
 
