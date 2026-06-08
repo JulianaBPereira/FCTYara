@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import time
 import tkinter as tk
 

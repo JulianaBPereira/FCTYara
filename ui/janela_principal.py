@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -9,7 +10,7 @@ from services.barcode_service import BarcodeService
 from services.execute_service import desligar_placa, executar
 from services.log_service import salvar_log
 from services.rastreio_service import carregar_config_rastreio, pasta_logs_efetiva
-from services.recipe_service import ReceitaService
+from services.recipe_service import carregar_passos
 from ui.Avisos.confirmacao_popup import perguntar as perguntar_popup
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
@@ -147,11 +148,8 @@ class JanelaPrincipal(tk.Tk):
 
     def _aplicar_configuracao_bg(self, porta: str, baud: int, receita: str) -> None:
         conectado = conectar(porta, baud)
-        receita_obj = None
-        for item in ReceitaService("", []).carregar_receitas():
-            if item.title == receita:
-                receita_obj = item
-                break
+        passos = carregar_passos(receita)
+        receita_obj = Recipe(title=receita, steps=passos) if passos is not None else None
         self.after(
             0,
             lambda: self._finalizar_configuracao(

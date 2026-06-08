@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import os
 import sys
 from pathlib import Path

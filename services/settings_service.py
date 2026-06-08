@@ -1,3 +1,5 @@
+# Juliana Pereira | Delta Sollutions - 2026
+
 from dataclasses import asdict
 from pathlib import Path
 import json

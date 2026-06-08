@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import tkinter as tk
 
 from ui.branding import GEOMETRIA_PADRAO, aplicar_icone, centralizar_janela

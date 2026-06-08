@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import re
 from datetime import datetime
 from pathlib import Path
@@ -59,6 +60,10 @@ def _proximo_caminho(pasta: Path, nome_base: str, extensao: str) -> Path:
     return caminho
 
 
+def _linha(r: dict) -> str:
+    return f"{r.get('nome', '')}; {r.get('range', '')}; {r.get('valor', '')}; {r.get('status', '')}"
+
+
 def _salvar_txt(
     pasta: Path,
     nome_base: str,
@@ -71,20 +76,13 @@ def _salvar_txt(
     caminho = _proximo_caminho(pasta, nome_base, ".txt")
 
     with open(caminho, "w", encoding="utf-8") as f:
-        f.write(f"Receita  : {receita}\n")
-        f.write(f"Serial   : {serial or '—'}\n")
+        f.write(f"Receita: {receita}\n")
+        f.write(f"Serial: {serial or '—'}\n")
         f.write(f"Data/hora: {agora.strftime('%d/%m/%Y %H:%M:%S')}\n")
         f.write(f"Resultado: {resultado_geral}\n")
-        f.write("-" * 65 + "\n")
-        f.write(f"{'TESTE':<28} {'RANGE':<15} {'VALOR':<12} {'STATUS'}\n")
-        f.write("-" * 65 + "\n")
+        f.write("\n")
         for r in resultados:
-            f.write(
-                f"{str(r.get('nome', '')):<28} "
-                f"{str(r.get('range', '')):<15} "
-                f"{str(r.get('valor', '')):<12} "
-                f"{r.get('status', '')}\n"
-            )
+            f.write(f"{_linha(r)}\n")
 
     return caminho
 

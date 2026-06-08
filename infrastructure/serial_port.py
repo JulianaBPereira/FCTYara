@@ -1,3 +1,5 @@
+# Juliana Pereira | Delta Sollutions - 2026
+
 import threading
 import queue
 import serial

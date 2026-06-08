@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import tkinter as tk
 from tkinter import filedialog
 

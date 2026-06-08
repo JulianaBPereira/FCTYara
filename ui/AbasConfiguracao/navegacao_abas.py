@@ -1,3 +1,5 @@
+# Juliana Pereira | Delta Sollutions - 2026
+
 import tkinter as tk
 from collections.abc import Callable
 

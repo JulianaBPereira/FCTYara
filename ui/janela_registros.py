@@ -1,3 +1,4 @@
+# Juliana Pereira | Delta Sollutions - 2026
 import calendar as cal_mod
 import os
 import tkinter as tk

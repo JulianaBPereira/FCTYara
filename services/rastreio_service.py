@@ -1,3 +1,5 @@
+# Juliana Pereira | Delta Sollutions - 2026
+
 import json
 import sys
 from pathlib import Path
@@ -45,7 +47,7 @@ def carregar_config_rastreio() -> dict:
 
 
 def pasta_logs_efetiva() -> Path:
-    """Retorna a pasta configurada, ou a padrão se não estiver configurada."""
+    # Retorna a pasta configurada, ou a padrão se não estiver configurada.
     config = carregar_config_rastreio()
     pasta_str = config.get("pasta", "").strip()
     return Path(pasta_str) if pasta_str else pasta_logs_padrao()

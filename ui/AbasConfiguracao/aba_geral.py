@@ -3,7 +3,7 @@ from enum import Enum
 from tkinter import ttk
 
 from infrastructure.serial_port import listar_portas
-from services.recipe_service import ReceitaService
+from services.recipe_service import carregar_receitas
 from services.settings_service import SettingsService, carregar_configuracao
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
@@ -155,12 +155,10 @@ class AbaGeral:
         )
 
     def _receitas(self, parent, valor_atual: str = ""):
-        receitas = ReceitaService("", []).carregar_receitas()
-        nomes = [receita.title for receita in receitas]
         self.combo_receita = self._combo_campo(
             parent,
             "Receitas",
-            nomes,
+            carregar_receitas(),
             valor_atual,
             margem_superior=8,
         )
@@ -192,8 +190,7 @@ class AbaGeral:
                 self.combo_receita.set(receita_salva)
 
     def atualizar_receitas(self) -> None:
-        receitas = ReceitaService("", []).carregar_receitas()
-        nomes = [receita.title for receita in receitas]
+        nomes = carregar_receitas()
         atual = self.combo_receita.get()
         self.combo_receita.configure(values=nomes)
         if atual in nomes:

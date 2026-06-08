@@ -1,3 +1,5 @@
+# Juliana Pereira | Delta Sollutions - 2026
+
 from domain.models import Step
 from infrastructure.serial_port import enviar_comando, log
 
