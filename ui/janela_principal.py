@@ -1,10 +1,11 @@
+import threading
 import tkinter as tk
 from tkinter import ttk
 
 from domain.models import Recipe, Step
-from infrastructure.serial_port import conectar, enviar_comando
+from infrastructure.serial_port import conectar
 from services.barcode_service import BarcodeService
-from services.execute_service import disparar_display, executar
+from services.execute_service import desligar_placa, executar
 from services.log_service import salvar_log
 from services.rastreio_service import carregar_config_rastreio, pasta_logs_efetiva
 from services.recipe_service import ReceitaService
@@ -39,7 +40,7 @@ class JanelaPrincipal(tk.Tk):
         self.aplicacao = aplicacao
 
         configurar_app_id()
-        self.title("FTCYara v1.0.0")
+        self.title("FCTDelta v1.0.0")
         self.geometry(GEOMETRIA_PADRAO)
         self.minsize(640, 400)
         self.configure(bg=t.COR_BRANCO)
@@ -62,11 +63,30 @@ class JanelaPrincipal(tk.Tk):
         settings = carregar_configuracao()
         if not settings or not settings.channelAPort:
             return
-        self.aplicar_configuracao(
-            settings.channelAPort,
-            settings.channelABaud,
-            settings.channelARecipe,
-        )
+        threading.Thread(
+            target=self._conectar_e_carregar,
+            args=(settings.channelAPort, settings.channelABaud, settings.channelARecipe),
+            daemon=True,
+        ).start()
+
+    def _conectar_e_carregar(self, porta: str, baud: int, receita: str) -> None:
+        conectado = conectar(porta, baud)
+        receita_obj = None
+        for item in ReceitaService("", []).carregar_receitas():
+            if item.title == receita:
+                receita_obj = item
+                break
+        self.after(0, lambda: self._aplicar_restauracao(conectado, porta, baud, receita, receita_obj))
+
+    def _aplicar_restauracao(self, conectado: bool, porta: str, baud: int, receita: str, receita_obj) -> None:
+        self._definir_status(conectado, porta, baud, receita)
+        if receita_obj is not None:
+            self._receita_ativa = receita_obj
+            testes = [
+                {"nome": passo.name, "range": self._range_coluna(passo)}
+                for passo in receita_obj.steps
+            ]
+            self.carregar_testes(testes)
 
     # ── Montagem ──────────────────────────────────────────────────────────────
 
@@ -140,28 +160,10 @@ class JanelaPrincipal(tk.Tk):
         self._bolinha_ligada = True
         self._canvas_bolinha.itemconfig(self._bolinha_id, fill=cor)
 
-    def _valor_esperado_display(self, receita: Recipe | None = None) -> str:
-        receita = receita or self._receita_ativa
-        if not receita:
-            return ""
-        for passo in receita.steps:
-            if passo.name.strip().upper() == "DISPLAY":
-                return (passo.expectedValue or "").strip()
-        return ""
-
     def _range_coluna(self, passo: Step) -> str:
-        if passo.type == "Pop-up" or passo.name.strip().upper() == "DISPLAY":
+        if passo.type == "Pop-up":
             return "Pop-up"
         return passo.expectedValue
-
-    def _valor_para_popup(self, passo_popup: Step) -> str:
-        valor = self._valor_esperado_display()
-        if valor:
-            return valor
-        return (passo_popup.expectedValue or "").strip()
-
-    def _eh_passo_display(self, passo: Step) -> bool:
-        return passo.name.strip().upper() in ("CHECAR DISPLAY", "DISPLAY")
 
     def aplicar_configuracao(self, porta: str, baud: int, receita: str) -> None:
         conectado = conectar(porta, baud)
@@ -474,7 +476,7 @@ class JanelaPrincipal(tk.Tk):
             cursor="hand2",
             bd=0,
             padx=16,
-            pady=10,
+            pady=20,
         )
         self.botao_iniciar.configure(command=self._iniciar_teste)
         self.botao_iniciar.grid(row=2, column=0, sticky="ew", pady=(8, 0))
@@ -500,6 +502,12 @@ class JanelaPrincipal(tk.Tk):
         return any(
             self._status_linha(i) == t.STATUS_FAIL
             for i in range(len(self._ids_linhas_tabela))
+        )
+
+    def _tem_falha_apos_barcode(self) -> bool:
+        return any(
+            self._status_linha(i) == t.STATUS_FAIL
+            for i in range(1, len(self._ids_linhas_tabela))
         )
 
     def _barcode_aprovado(self) -> bool:
@@ -568,64 +576,103 @@ class JanelaPrincipal(tk.Tk):
             pass
 
     def _executar_lote_serial(self) -> None:
-        while self._indice_passo < len(self._receita_ativa.steps):
-            passo = self._receita_ativa.steps[self._indice_passo]
-            if self._eh_passo_display(passo):
-                if not disparar_display():
-                    self._atualizar_linha_teste(
-                        self._indice_passo,
-                        "ERRO: porta serial não conectada",
-                        t.STATUS_FAIL,
-                    )
-                    self._salvar_log()
-                    return
-                valor_display = self._valor_para_popup(passo)
-                aprovado = perguntar_popup(self, "", valor_display)
-                status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
-                self._atualizar_linha_teste(
-                    self._indice_passo,
-                    valor_display or ("Sim" if aprovado else "Não"),
-                    status,
-                )
-                self._indice_passo += 1
-                if not aprovado:
-                    enviar_comando("2")
-                    self._salvar_log()
-                    return
-                continue
-            if passo.type == "Pop-up":
-                valor_display = self._valor_para_popup(passo)
-                aprovado = perguntar_popup(
-                    self,
-                    "",
-                    valor_display,
-                )
-                status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
-                self._atualizar_linha_teste(
-                    self._indice_passo,
-                    valor_display or ("Sim" if aprovado else "Não"),
-                    status,
-                )
-                self._indice_passo += 1
-                if not aprovado:
-                    enviar_comando("2")
-                    self._salvar_log()
-                    return
-                continue
-            if passo.type != "Serial":
-                self._indice_passo += 1
-                continue
-            resultado = executar(passo)
-            status = t.STATUS_PASS if resultado["aprovado"] else t.STATUS_FAIL
-            self._atualizar_linha_teste(self._indice_passo, resultado["resposta"], status)
-            if status == t.STATUS_FAIL:
-                enviar_comando("2")
-                self._salvar_log()
-                return
-            self._indice_passo += 1
+        self._executar_passo()
 
-        enviar_comando("2")
+    def _executar_passo(self) -> None:
+        if not self._receita_ativa or self._indice_passo >= len(self._receita_ativa.steps):
+            self._finalizar_lote()
+            return
+
+        passo = self._receita_ativa.steps[self._indice_passo]
+        cmd = passo.command.strip()
+
+        if cmd == "4":
+            threading.Thread(
+                target=self._passo_comando_bg,
+                args=(passo,),
+                daemon=True,
+            ).start()
+            return
+
+        if passo.type == "Pop-up":
+            self._executar_passo_popup(passo)
+            return
+
+        if passo.type == "Serial":
+            threading.Thread(
+                target=self._passo_comando_bg,
+                args=(passo,),
+                daemon=True,
+            ).start()
+            return
+
+        self._indice_passo += 1
+        self.after(0, self._executar_passo)
+
+    def _executar_passo_popup(self, passo: Step) -> None:
+        valor = (passo.expectedValue or "").strip()
+        aprovado = perguntar_popup(self, "", valor)
+        status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
+        self._atualizar_linha_teste(
+            self._indice_passo,
+            valor or ("Sim" if aprovado else "Não"),
+            status,
+        )
+        self._indice_passo += 1
+        if not aprovado:
+            self._finalizar_lote()
+            return
+        self.after(0, self._executar_passo)
+
+    def _passo_comando_bg(self, passo: Step) -> None:
+        resultado = executar(passo)
+        self.after(0, lambda: self._passo_comando_concluido(passo, resultado))
+
+    def _passo_comando_concluido(self, passo: Step, resultado: dict) -> None:
+        if passo.command.strip() == "4":
+            if resultado["resultado"] != "Pass":
+                self._atualizar_linha_teste(
+                    self._indice_passo,
+                    resultado["resposta"] or "—",
+                    t.STATUS_FAIL,
+                )
+                self._finalizar_lote()
+                return
+
+            valor = (passo.expectedValue or "").strip()
+            aprovado = perguntar_popup(self, "", valor)
+            status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
+            self._atualizar_linha_teste(
+                self._indice_passo,
+                valor or ("Sim" if aprovado else "Não"),
+                status,
+            )
+            self._indice_passo += 1
+            if not aprovado:
+                self._finalizar_lote()
+                return
+            self.after(0, self._executar_passo)
+            return
+
+        status = t.STATUS_PASS if resultado["resultado"] == "Pass" else t.STATUS_FAIL
+        self._atualizar_linha_teste(
+            self._indice_passo,
+            resultado["resposta"] or "—",
+            status,
+        )
+        if status == t.STATUS_FAIL:
+            self._finalizar_lote()
+            return
+        self._indice_passo += 1
+        self.after(0, self._executar_passo)
+
+    def _finalizar_lote(self) -> None:
         self._salvar_log()
+        if self._tem_falha_apos_barcode():
+            threading.Thread(target=self._desligar_placa_bg, daemon=True).start()
+
+    def _desligar_placa_bg(self) -> None:
+        desligar_placa()
 
     def _ao_ler_barcode(self, codigo: str) -> None:
         if not self._receita_ativa or self._indice_passo != 0:

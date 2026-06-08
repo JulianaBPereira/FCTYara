@@ -13,8 +13,8 @@ _DEFAULTS = {
 
 def _arquivo_config() -> Path:
     if sys.platform == "win32":
-        return Path.home() / "Desktop" / "FCTYara" / "rastreio.json"
-    return Path("/var/app-data/FCTYara/rastreio.json")
+        return Path.home() / "Desktop" / "FCTDelta" / "rastreio.json"
+    return Path("/var/app-data/FCTDelta/rastreio.json")
 
 
 def salvar_config_rastreio(pasta: str, formato_txt: bool, formato_excel: bool) -> None:

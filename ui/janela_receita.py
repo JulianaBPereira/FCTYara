@@ -21,7 +21,7 @@ class JanelaReceita(tk.Toplevel):
         self.title("Criar Receita")
         self.geometry(GEOMETRIA_PADRAO)
         self.resizable(True, True)
-        self.minsize(640, 400)
+        self.minsize(800, 400)
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
@@ -168,7 +168,7 @@ class JanelaReceita(tk.Toplevel):
         # Cabeçalho
         cab = tk.Frame(container, bg=t.COR_BRANCO)
         cab.pack(fill="x")
-        for texto in ("NOME DO TESTE", "TIPO", "VALOR ESPERADO"):
+        for texto in ("NOME DO TESTE", "TIPO", "COMANDO", "VALOR ESPERADO"):
             tk.Label(
                 cab, 
                 text=texto, 
@@ -249,7 +249,21 @@ class JanelaReceita(tk.Toplevel):
 
     # ── Lógica ────────────────────────────────────────────────────────────────
 
-    def _adicionar_linha(self, nome="Passo", tipo="Serial", ValorEsperado_val="F9A3"):
+    def _atualizar_campo_comando(self, combo_tipo, entry_comando):
+        if combo_tipo.get().strip() in ("Serial", "Pop-up"):
+            entry_comando.config(state="normal")
+            return
+        entry_comando.config(state="normal")
+        entry_comando.delete(0, "end")
+        entry_comando.config(state="disabled")
+
+    def _adicionar_linha(
+        self,
+        nome="Passo",
+        tipo="Serial",
+        comando_val="",
+        ValorEsperado_val="F9A3",
+    ):
         dados = {}  # dict mutável — os lambdas abaixo capturam a referência
 
         linha_frame = tk.Frame(self.container_linhas, bg=t.COR_BRANCO)
@@ -274,15 +288,27 @@ class JanelaReceita(tk.Toplevel):
         )
         frame_tipo.pack(side="left", expand=True, fill="x", padx=4)
 
+        frame_comando, entry_comando = self._campo_texto(
+            conteudo, comando_val, on_focus=selecionar, linha_ref=linha_ativa,
+        )
+        frame_comando.pack(side="left", expand=True, fill="x", padx=4)
+
         frame_valor, entry_valor = self._campo_texto(
             conteudo, ValorEsperado_val, on_focus=selecionar, linha_ref=linha_ativa,
         )
         frame_valor.pack(side="left", expand=True, fill="x", padx=4)
 
+        combo_tipo.bind(
+            "<<ComboboxSelected>>",
+            lambda e: self._atualizar_campo_comando(combo_tipo, entry_comando),
+        )
+        self._atualizar_campo_comando(combo_tipo, entry_comando)
+
         dados.update({
             "frame": linha_frame,
             "entry_nome": entry_nome,
             "combo_tipo": combo_tipo,
+            "entry_comando": entry_comando,
             "entry_valor": entry_valor,
         })
         self.linhas.append(dados)
@@ -320,16 +346,39 @@ class JanelaReceita(tk.Toplevel):
         for linha in self.linhas:
             nome = linha["entry_nome"].get().strip()
             tipo = linha["combo_tipo"].get().strip()
+            comando = (
+                linha["entry_comando"].get().strip()
+                if tipo in ("Serial", "Pop-up")
+                else ""
+            )
             valor = linha["entry_valor"].get().strip()
-            if not nome and not tipo and not valor:
+            if not nome and not tipo and not comando and not valor:
                 continue
-            passos.append(Step(name=nome, type=tipo, expectedValue=valor))
+            passos.append(
+                Step(name=nome, type=tipo, command=comando, expectedValue=valor)
+            )
         return passos
+
+    def _validar_passos(self, passos: list[Step]) -> str | None:
+        for passo in passos:
+            cmd = passo.command.strip()
+            if passo.type == "Serial":
+                if not cmd:
+                    return f'Comando obrigatório no passo "{passo.name}".'
+                if cmd not in ("1", "2", "3"):
+                    return f'Comando inválido no passo "{passo.name}": use 1, 2 ou 3.'
+            elif passo.type == "Pop-up" and cmd and cmd != "4":
+                return f'Comando inválido no passo "{passo.name}": use 4 para acionar o display.'
+        return None
 
     def _salvar_receita(self):
         """Chamado pelo btn_Salvar: lê a tela e delega ao ReceitaService."""
         titulo = self.campo_titulo.get()
         passos = self._coletar_passos()
+        erro = self._validar_passos(passos)
+        if erro:
+            mostrar_mensagem(self, "Receita", erro, tipo="aviso")
+            return
         erro = ReceitaService(titulo, passos, titulo_original=self.nome_editar).salvar_receita()
         if erro:
             mostrar_mensagem(self, "Receita", erro, tipo="aviso")

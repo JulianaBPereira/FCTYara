@@ -1,51 +1,41 @@
 from domain.models import Step
-from infrastructure.serial_port import enviar_comando, enviar_sem_resposta, obter_conexao
-
-
-def disparar_display() -> bool:
-    # Envia comando 4; o hardware não retorna resposta — o operador confirma na UI.
-    if obter_conexao() is None:
-        return False
-    ok = enviar_sem_resposta("4")
-    if ok:
-        print("Enviado: 4")
-    return ok
+from infrastructure import serial_port
+from infrastructure.serial_port import enviar_comando,_conexao, _TIMEOUT_RESPOSTA
 
 
 def executar(step: Step) -> dict:
-    if obter_conexao() is None:
-        return {"nome": step.name, "resposta": "ERRO: porta serial não conectada", "aprovado": False}
+    cmd = step.command.strip()
 
-    nome = step.name.upper().strip()
+    if not cmd:
+        return {"nome": step.name, "resposta": "Comando não definido", "resultado": "Fail"}
 
-    if nome == "LIGAR PLACA":
-        resposta = enviar_comando("1")
-        print(f"Enviado: 1")
-
-    elif nome == "DESLIGAR PLACA":
-        resposta = enviar_comando("2")
-        print(f"Enviado: 2")
-
-    elif nome == "COMUNICAÇÃO":
-        resposta = enviar_comando("3")
-        print(f"Enviado: 3")
-
+    if cmd == "1":
+        esperado = "1"
+    elif cmd == "2":
+        esperado = "2"
+    elif cmd == "3":
+        esperado = "3"
+    elif cmd == "4":
+        return {"nome": step.name, "resposta": "", "resultado": "Pass"}
     else:
-        return {"nome": step.name, "resposta": "Teste não cadastrado", "aprovado": False}
+        return {"nome": step.name, "resposta": "Erro: comando desconhecido", "resultado": "Fail"}
 
-    # pega só a primeira linha limpa
-    primeira_linha = resposta.split("\n")[0].strip().strip("\r")
-    print(f"Recebido: {repr(primeira_linha)}")
+    resposta = enviar_comando(cmd).split("\n")[0].strip().strip("\r").split(";")[0].strip()
 
-    if not primeira_linha or primeira_linha == "0":
-        return {"nome": step.name, "resposta": "0", "aprovado": False}
+    if resposta == esperado:
+        return {"nome": step.name, "resposta": resposta, "resultado": "Pass"}
+    else:
+        return {"nome": step.name, "resposta": resposta or "0", "resultado": "Fail"}
 
-    valor = primeira_linha.split(";")[0]
-
-    aprovado = primeira_linha in ("1;X", "2;X", "3;X", "4;X")
-
-    return {
-        "nome": step.name,
-        "resposta": valor,
-        "aprovado": aprovado
-    }
+def desligar_placa() -> None:
+    if not _conexao or not _conexao.is_open:
+        return
+    try:
+        _conexao.reset_input_buffer()
+        _conexao.write(b"2\n")
+        _conexao.flush()
+        _conexao.timeout = 2
+        _conexao.readline()  # consome a resposta
+        _conexao.timeout = _TIMEOUT_RESPOSTA
+    except Exception:
+        pass

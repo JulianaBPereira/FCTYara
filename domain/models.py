@@ -6,7 +6,8 @@ from typing import List
 class Step:
     name: str
     type: str
-    expectedValue: str
+    command: str = ""
+    expectedValue: str = ""
 
 @dataclass
 class Recipe:

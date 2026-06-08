@@ -8,8 +8,8 @@ from domain.models import Settings
 
 def _pasta_configuracao() -> Path:
     if sys.platform == "win32":
-        return Path.home() / "Desktop" / "FCTYara"
-    return Path("/var/app-data/FCTYara")
+        return Path.home() / "Desktop" / "FCTDelta"
+    return Path("/var/app-data/FCTDelta")
 
 # Essa função serve para salvar as escolhas do setup pelo usuario, 
 # salvar a porta COM escolhida, o baud rate e a receita 
@@ -71,8 +71,8 @@ def carregar_configuracao() -> Settings | None:
     )
 
 # Raspberry: se /var/app-data não existir ou faltar permissão, criar uma vez com:
-# sudo mkdir -p /var/app-data/FCTYara
+# sudo mkdir -p /var/app-data/FCTDelta
 # sudo chown -R delta:delta /var/app-data
 # chmod -R 750 /var/app-data
-# Windows (teste): salva em Desktop/FCTYara/settings.json
+# Windows (teste): salva em Desktop/FCTDelta/settings.json
 

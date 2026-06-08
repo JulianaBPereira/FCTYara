@@ -6,8 +6,8 @@ from ui.janela_configuracao import JanelaConfiguracao
 from ui.janela_principal import JanelaPrincipal
 from ui.janela_receita import JanelaReceita
 
-class AplicacaoFTCYara:
-    # Coordena as janelas independentes do FTCYara.
+class AplicacaoFCTDelta:
+    # Coordena as janelas independentes do FCTDelta.
 
     def __init__(self):
         self.janela_principal: JanelaPrincipal | None = None

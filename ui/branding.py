@@ -7,21 +7,22 @@ import tkinter as tk
 from pathlib import Path
 
 _PASTA_IMAGENS = Path(__file__).resolve().parent / "Images"
-LOGO_ICO = _PASTA_IMAGENS / "ELUX-LOGO.ico"
-LOGO_PNG = _PASTA_IMAGENS / "ELUX-LOGO.png"
+LOGO_ICO = _PASTA_IMAGENS / "Logo.ico"
+LOGO_PNG = _PASTA_IMAGENS / "Logo.png"
 
 
 def aplicar_icone(janela: tk.Misc) -> None:
     """Define o ícone na barra de tarefas e na barra de título da janela."""
-    if not LOGO_ICO.is_file():
-        return
-    try:
-        janela.iconbitmap(str(LOGO_ICO))
-    except tk.TclError:
-        if LOGO_PNG.is_file():
-            foto = tk.PhotoImage(file=str(LOGO_PNG))
-            janela.iconphoto(True, foto)
-            janela._icone_janela = foto  # noqa: SLF001 — manter referência viva
+    if LOGO_ICO.is_file():
+        try:
+            janela.iconbitmap(str(LOGO_ICO))
+            return
+        except tk.TclError:
+            pass
+    if LOGO_PNG.is_file():
+        foto = tk.PhotoImage(file=str(LOGO_PNG))
+        janela.iconphoto(True, foto)
+        janela._icone_janela = foto  # noqa: SLF001 — manter referência viva
 
 
 LARGURA_PADRAO = 1024
@@ -111,6 +112,6 @@ def configurar_app_id() -> None:
     try:
         import ctypes
 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FTCYara.ELUX")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FCTDelta.ELUX")
     except (AttributeError, OSError):
         pass

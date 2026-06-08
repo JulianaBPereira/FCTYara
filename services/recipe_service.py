@@ -80,20 +80,20 @@ def _ler_arquivo_receita(arquivo: Path) -> Recipe | None:
             data = json.load(f)
     except json.JSONDecodeError as e:
         print(
-            f"[FCTYara] Receita ignorada (JSON inválido): {arquivo.name} — {e}",
+            f"[FCTDelta] Receita ignorada (JSON inválido): {arquivo.name} — {e}",
             file=sys.stderr,
         )
         return None
     except OSError as e:
         print(
-            f"[FCTYara] Receita ignorada (erro ao ler): {arquivo.name} — {e}",
+            f"[FCTDelta] Receita ignorada (erro ao ler): {arquivo.name} — {e}",
             file=sys.stderr,
         )
         return None
 
     if not isinstance(data, dict):
         print(
-            f"[FCTYara] Receita ignorada (formato inválido): {arquivo.name}",
+            f"[FCTDelta] Receita ignorada (formato inválido): {arquivo.name}",
             file=sys.stderr,
         )
         return None
@@ -111,7 +111,7 @@ def _ler_arquivo_receita(arquivo: Path) -> Recipe | None:
             passos.append(Step(**item))
         except TypeError as e:
             print(
-                f"[FCTYara] Passo {i + 1} ignorado em {arquivo.name}: {e}",
+                f"[FCTDelta] Passo {i + 1} ignorado em {arquivo.name}: {e}",
                 file=sys.stderr,
             )
 

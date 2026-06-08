@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
 
-_NOME_PASTA = "FCTYaraLogs"
+_NOME_PASTA = "FCTDeltaLogs"
 
 
 def pasta_logs_padrao() -> Path:
-    # Desktop.FCTYaraLogs - Windows (usuário atual) ou Raspberry (delta).
+    # Desktop.FCTDeltaLogs - Windows (usuário atual) ou Raspberry (delta).
     
     if sys.platform == "win32":
         return Path.home() / "Desktop" / _NOME_PASTA

@@ -43,6 +43,7 @@ class NavegacaoAbas:
         )
         rotulo.pack(side="left")
         rotulo.bind("<Button-1>", lambda _, i=indice: self.selecionar(i))
+        rotulo.bind("<ButtonRelease-1>", lambda _, i=indice: self.selecionar(i))
         rotulo.bind("<Enter>", lambda _, i=indice: self._entrar(i))
         rotulo.bind("<Leave>", lambda _, i=indice: self._sair(i))
         self._rotulos.append(rotulo)

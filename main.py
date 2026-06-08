@@ -1,4 +1,4 @@
-from Aplication import AplicacaoFTCYara
+from Aplication import AplicacaoFCTDelta
 
 if __name__ == "__main__":
-    AplicacaoFTCYara().iniciar()
+    AplicacaoFCTDelta().iniciar()

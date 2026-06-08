@@ -78,7 +78,7 @@ class Submenu:
         popup.attributes("-topmost", True)
         self.popup = popup
 
-        self.janela.after_idle(self._ouvir_clique_fora)
+        self.janela.after(200, self._ouvir_clique_fora)
 
     def _ouvir_clique_fora(self):
         def fora(event):
@@ -125,6 +125,8 @@ class Submenu:
         def clicar(_event=None):
             if comando is None:
                 return
+            if self.popup is None:
+                return
             fechar_menu()
             comando()
 
@@ -136,6 +138,7 @@ class Submenu:
 
         for widget in (linha, *linha.winfo_children()):
             widget.bind("<Button-1>", clicar)
+            widget.bind("<ButtonRelease-1>", clicar)
             widget.bind("<Enter>", lambda _: hover(True))
             widget.bind("<Leave>", lambda _: hover(False))
 
