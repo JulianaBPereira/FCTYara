@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 from ui.janela_barcode import JanelaBarcode
 from ui.janela_configuracao import JanelaConfiguracao
@@ -60,26 +61,11 @@ class AplicacaoFCTDelta:
     def ao_fechar_barcode(self) -> None:
         self._janela_barcode = None
 
-    def _fechar_janelas_secundarias(self) -> None:
-        for janela in (
-            self._janela_configuracao,
-            self._janela_receita,
-            self._janela_barcode,
-        ):
-            if self._esta_aberta(janela):
-                janela.destroy()
-        self._janela_configuracao = None
-        self._janela_receita = None
-        self._janela_barcode = None
-
     def reiniciar(self) -> None:
-        # Fecha tudo e relança o processo do zero.
         if self.janela_principal is None:
             return
 
-        self._fechar_janelas_secundarias()
-        self.janela_principal.destroy()
-
-        # Substitui o processo atual por uma nova execução do mesmo script.
-        # Nada após essa linha é executado.
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        pasta_projeto = Path(__file__).resolve().parent
+        script = pasta_projeto / "main.py"
+        os.chdir(pasta_projeto)
+        os.execv(sys.executable, [sys.executable, str(script)])

@@ -102,7 +102,7 @@ class JanelaConfiguracao(tk.Toplevel):
 
     def atualizar(self) -> None:
         if self.aba_geral:
-            self.aba_geral.atualizar_receitas()
+            self.aba_geral.atualizar()
 
     def _salvar_geral(self):
         if self.aba_geral:

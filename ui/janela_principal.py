@@ -3,13 +3,13 @@ import tkinter as tk
 from tkinter import ttk
 
 from domain.models import Recipe, Step
+from infrastructure import serial_port
 from infrastructure.serial_port import conectar
 from services.barcode_service import BarcodeService
 from services.execute_service import desligar_placa, executar
 from services.log_service import salvar_log
 from services.rastreio_service import carregar_config_rastreio, pasta_logs_efetiva
 from services.recipe_service import ReceitaService
-from services.settings_service import carregar_configuracao
 from ui.Avisos.confirmacao_popup import perguntar as perguntar_popup
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
@@ -30,6 +30,7 @@ class JanelaPrincipal(tk.Tk):
         2. Linha de estado  — conexão, porta, baud e receita ativa
         3. Tabela           — colunas TESTE | RANGE | VALOR | STATUS
         4. Botão            — Iniciar teste
+        5. Log serial       — TX/RX dos comandos
     """
 
     # Colunas da tabela na ordem em que aparecem
@@ -56,37 +57,8 @@ class JanelaPrincipal(tk.Tk):
         self._labels_status: list[tk.Label] = []
 
         self._montar_interface()
+        serial_port._on_log = self._exibir_log
         centralizar_na_tela(self)
-        self._restaurar_configuracao()
-
-    def _restaurar_configuracao(self) -> None:
-        settings = carregar_configuracao()
-        if not settings or not settings.channelAPort:
-            return
-        threading.Thread(
-            target=self._conectar_e_carregar,
-            args=(settings.channelAPort, settings.channelABaud, settings.channelARecipe),
-            daemon=True,
-        ).start()
-
-    def _conectar_e_carregar(self, porta: str, baud: int, receita: str) -> None:
-        conectado = conectar(porta, baud)
-        receita_obj = None
-        for item in ReceitaService("", []).carregar_receitas():
-            if item.title == receita:
-                receita_obj = item
-                break
-        self.after(0, lambda: self._aplicar_restauracao(conectado, porta, baud, receita, receita_obj))
-
-    def _aplicar_restauracao(self, conectado: bool, porta: str, baud: int, receita: str, receita_obj) -> None:
-        self._definir_status(conectado, porta, baud, receita)
-        if receita_obj is not None:
-            self._receita_ativa = receita_obj
-            testes = [
-                {"nome": passo.name, "range": self._range_coluna(passo)}
-                for passo in receita_obj.steps
-            ]
-            self.carregar_testes(testes)
 
     # ── Montagem ──────────────────────────────────────────────────────────────
 
@@ -102,6 +74,7 @@ class JanelaPrincipal(tk.Tk):
         self._montar_linha_estado(painel)
         self._montar_tabela(painel)
         self._montar_botao_iniciar(painel)
+        self._montar_log_serial(painel)
 
     # ── 1. Linha de estado ────────────────────────────────────────────────────
 
@@ -166,21 +139,47 @@ class JanelaPrincipal(tk.Tk):
         return passo.expectedValue
 
     def aplicar_configuracao(self, porta: str, baud: int, receita: str) -> None:
+        threading.Thread(
+            target=self._aplicar_configuracao_bg,
+            args=(porta, baud, receita),
+            daemon=True,
+        ).start()
+
+    def _aplicar_configuracao_bg(self, porta: str, baud: int, receita: str) -> None:
         conectado = conectar(porta, baud)
-        self._definir_status(conectado, porta, baud, receita)
-        self._receita_ativa = None
+        receita_obj = None
         for item in ReceitaService("", []).carregar_receitas():
             if item.title == receita:
-                self._receita_ativa = item
-                testes = [
-                    {
-                        "nome": passo.name,
-                        "range": self._range_coluna(passo),
-                    }
-                    for passo in item.steps
-                ]
-                self.carregar_testes(testes)
+                receita_obj = item
                 break
+        self.after(
+            0,
+            lambda: self._finalizar_configuracao(
+                conectado, porta, baud, receita, receita_obj,
+            ),
+        )
+
+    def _finalizar_configuracao(
+        self,
+        conectado: bool,
+        porta: str,
+        baud: int,
+        receita: str,
+        receita_obj: Recipe | None,
+    ) -> None:
+        self._definir_status(conectado, porta, baud, receita)
+        if receita_obj is None:
+            self._receita_ativa = None
+            return
+        self._receita_ativa = receita_obj
+        testes = [
+            {
+                "nome": passo.name,
+                "range": self._range_coluna(passo),
+            }
+            for passo in receita_obj.steps
+        ]
+        self.carregar_testes(testes)
 
     # ── 2. Tabela ─────────────────────────────────────────────────────────────
 
@@ -481,6 +480,52 @@ class JanelaPrincipal(tk.Tk):
         self.botao_iniciar.configure(command=self._iniciar_teste)
         self.botao_iniciar.grid(row=2, column=0, sticky="ew", pady=(8, 0))
 
+    def _montar_log_serial(self, painel):
+        linha = tk.Frame(painel, bg=t.COR_BRANCO)
+        linha.grid(row=3, column=0, sticky="ew", pady=(6, 0))
+
+        self._var_enviado = tk.StringVar(value="")
+        self._var_recebido = tk.StringVar(value="")
+
+        tk.Label(
+            linha, text="enviado:", font=t.FONTE_NORMAL,
+            bg=t.COR_BRANCO, fg=t.COR_PRIMARIA,
+        ).pack(side="left")
+        tk.Label(
+            linha, textvariable=self._var_enviado, font=t.FONTE_NORMAL,
+            bg=t.COR_BRANCO, fg=t.COR_AZUL_MARINHO,
+        ).pack(side="left", padx=(4, 16))
+
+        tk.Label(
+            linha, text="recebido:", font=t.FONTE_NORMAL,
+            bg=t.COR_BRANCO, fg=t.COR_PRIMARIA,
+        ).pack(side="left")
+        tk.Label(
+            linha, textvariable=self._var_recebido, font=t.FONTE_NORMAL,
+            bg=t.COR_BRANCO, fg=t.COR_AZUL_MARINHO,
+        ).pack(side="left", padx=(4, 0))
+
+        self._label_alerta = tk.Label(
+            linha, text="", font=t.FONTE_BOLD,
+            bg=t.COR_BRANCO, fg=t.COR_VERMELHO,
+        )
+        self._label_alerta.pack(side="right")
+
+    def _exibir_log(self, enviado: str, recebido: str, alerta: str = "") -> None:
+        if not self.winfo_exists():
+            return
+        self.after(0, lambda: self._atualizar_log(enviado, recebido, alerta))
+
+    def _atualizar_log(self, enviado: str, recebido: str, alerta: str = "") -> None:
+        if enviado:
+            atual = self._var_enviado.get()
+            self._var_enviado.set(f"{atual}, {enviado}" if atual else enviado)
+        if recebido:
+            atual = self._var_recebido.get()
+            self._var_recebido.set(f"{atual}, {recebido}" if atual else recebido)
+        if alerta:
+            self._label_alerta.config(text=alerta)
+
     def _atualizar_linha_teste(self, indice: int, valor: str, status: str) -> None:
         if indice >= len(self._ids_linhas_tabela):
             return
@@ -539,6 +584,9 @@ class JanelaPrincipal(tk.Tk):
 
         self._indice_passo = 0
         self._serial_atual = ""
+        self._var_enviado.set("")
+        self._var_recebido.set("")
+        self._label_alerta.config(text="")
         self._reiniciar_resultados_tabela()
         self._executar_barcode()
 

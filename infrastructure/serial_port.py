@@ -1,4 +1,3 @@
-import time
 import threading
 import queue
 import serial
@@ -9,6 +8,12 @@ _TIMEOUT_RESPOSTA = 5
 _conexao: serial.Serial | None = None
 _fila: queue.Queue = queue.Queue()
 _lendo = False
+_on_log = None
+
+
+def log(enviado: str = "", recebido: str = "", alerta: str = "") -> None:
+    if _on_log:
+        _on_log(enviado, recebido, alerta)
 
 
 def _loop_leitura() -> None:
@@ -32,7 +37,6 @@ def conectar(porta: str, baud: int) -> bool:
 
     try:
         _conexao = serial.Serial(porta, baud, timeout=1)
-        time.sleep(5)
 
         _lendo = True
         threading.Thread(target=_loop_leitura, daemon=True).start()

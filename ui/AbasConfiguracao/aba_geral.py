@@ -4,7 +4,7 @@ from tkinter import ttk
 
 from infrastructure.serial_port import listar_portas
 from services.recipe_service import ReceitaService
-from services.settings_service import SettingsService
+from services.settings_service import SettingsService, carregar_configuracao
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
 
@@ -64,9 +64,14 @@ class AbaGeral:
         form = tk.Frame(parent, bg=t.COR_BRANCO)
         form.pack(fill="x", padx=40, pady=16)
 
-        self._portas(form)
-        self._baud(form)
-        self._receitas(form)
+        settings = carregar_configuracao()
+        porta_salva = settings.channelAPort if settings else ""
+        baud_salvo = settings.channelABaud if settings else ""
+        receita_salva = settings.channelARecipe if settings else ""
+
+        self._portas(form, porta_salva)
+        self._baud(form, baud_salvo)
+        self._receitas(form, receita_salva)
 
     def _rolagem_combo(self, combo):
         def ajustar():
@@ -135,27 +140,56 @@ class AbaGeral:
         self._rolagem_combo(combo)
         return combo
 
-    def _portas(self, parent):
+    def _portas(self, parent, valor_atual: str = ""):
+        portas = listar_portas()
+        if valor_atual and valor_atual not in portas:
+            portas = [valor_atual, *portas]
         self.combo_porta = self._combo_campo(
-            parent, "Porta COM", listar_portas(), "",
+            parent, "Porta COM", portas, valor_atual,
         )
 
-    def _baud(self, parent):
+    def _baud(self, parent, valor_atual: int | str = ""):
         valores = [str(b) for b in Baud]
         self.combo_baud = self._combo_campo(
-            parent, "Baud rate", valores, "",
+            parent, "Baud rate", valores, valor_atual,
         )
 
-    def _receitas(self, parent):
+    def _receitas(self, parent, valor_atual: str = ""):
         receitas = ReceitaService("", []).carregar_receitas()
         nomes = [receita.title for receita in receitas]
         self.combo_receita = self._combo_campo(
             parent,
             "Receitas",
             nomes,
-            "",
+            valor_atual,
             margem_superior=8,
         )
+
+    def atualizar(self) -> None:
+        settings = carregar_configuracao()
+        porta_salva = settings.channelAPort if settings else ""
+        baud_salvo = settings.channelABaud if settings else ""
+        receita_salva = settings.channelARecipe if settings else ""
+
+        portas = listar_portas()
+        if porta_salva and porta_salva not in portas:
+            portas = [porta_salva, *portas]
+        self.combo_porta.configure(values=portas)
+        if porta_salva in portas:
+            self.combo_porta.set(porta_salva)
+        elif portas:
+            self.combo_porta.set(portas[0])
+
+        if baud_salvo:
+            self.combo_baud.set(str(baud_salvo))
+
+        self.atualizar_receitas()
+        if receita_salva:
+            nomes = self.combo_receita.cget("values")
+            if isinstance(nomes, str):
+                nomes = self.janela.tk.splitlist(nomes)
+            if receita_salva in nomes:
+                self.combo_receita.set(receita_salva)
 
     def atualizar_receitas(self) -> None:
         receitas = ReceitaService("", []).carregar_receitas()
