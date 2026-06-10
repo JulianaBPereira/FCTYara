@@ -17,8 +17,7 @@ def executar(step: Step) -> dict:
     elif cmd == "3":
         esperado = "3"
     elif cmd == "4":
-        log("4", "pop-up aberto")
-        return {"nome": step.name, "resposta": "", "resultado": "Pass"}
+        esperado = "4"
     else:
         return {"nome": step.name, "resposta": "Erro: comando desconhecido", "resultado": "Fail"}
 
@@ -27,7 +26,8 @@ def executar(step: Step) -> dict:
     resposta = resposta_bruta.split("\n")[0].strip().strip("\r").split(";")[0].strip()
 
     if resposta == esperado:
-        return {"nome": step.name, "resposta": resposta, "resultado": "Pass"}
+        resultado = "Pop-up" if cmd == "4" else "Pass"
+        return {"nome": step.name, "resposta": resposta, "resultado": resultado}
     else:
         return {"nome": step.name, "resposta": resposta or "0", "resultado": "Fail"}
 

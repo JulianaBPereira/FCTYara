@@ -759,15 +759,6 @@ class JanelaPrincipal(tk.Tk):
             return
 
         passo = self._receita_ativa.steps[self._indice_passo]
-        cmd = passo.command.strip()
-
-        if cmd == "4":
-            threading.Thread(
-                target=self._passo_comando_bg,
-                args=(passo,),
-                daemon=True,
-            ).start()
-            return
 
         if passo.type == "Pop-up":
             self._executar_passo_popup(passo)
@@ -804,16 +795,7 @@ class JanelaPrincipal(tk.Tk):
         self._fila_passos.put((passo, resultado))
 
     def _passo_comando_concluido(self, passo: Step, resultado: dict) -> None:
-        if passo.command.strip() == "4":
-            if resultado["resultado"] != "Pass":
-                self._atualizar_linha_teste(
-                    self._indice_passo,
-                    resultado["resposta"] or "—",
-                    t.STATUS_FAIL,
-                )
-                self._finalizar_lote()
-                return
-
+        if resultado["resultado"] == "Pop-up":
             valor = (passo.expectedValue or "").strip()
             aprovado = perguntar_popup(self, "", valor)
             status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
