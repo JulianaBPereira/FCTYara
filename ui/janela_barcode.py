@@ -13,6 +13,7 @@ class JanelaBarcode(tk.Toplevel):
 
     def __init__(self, aplicacao, *, on_ler=None):
         super().__init__(aplicacao.raiz)
+        self.withdraw()
         self.aplicacao = aplicacao
         self._on_ler = on_ler
         self._placeholder_ativo = True
@@ -21,11 +22,13 @@ class JanelaBarcode(tk.Toplevel):
         self.geometry("420x96")
         self.resizable(False, False)
         self.configure(bg=t.COR_BRANCO)
+        self.transient(aplicacao.raiz)
         aplicar_icone(self)
 
         self._montar_interface()
         centralizar_janela(self, aplicacao.raiz)
         self.protocol("WM_DELETE_WINDOW", self._fechar)
+        self.deiconify()
 
         self.after(50, self.focar_campo)
 

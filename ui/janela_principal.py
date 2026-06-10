@@ -724,7 +724,7 @@ class JanelaPrincipal(tk.Tk):
         """Recebeu 'start' do bimanual: inicia os testes."""
         self._parar_aguardar_bimanual()
         self.botao_iniciar.config(state="disabled")
-        self._atualizar_log("", "start", alerta="Iniciando testes")
+        self._atualizar_log("", "BIMANUAL_ON", alerta="Iniciando testes")
         self._executar_lote_serial()
 
     # ── Finalização ───────────────────────────────────────────────────────────
