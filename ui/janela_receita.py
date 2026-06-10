@@ -18,6 +18,7 @@ class JanelaReceita(tk.Toplevel):
         self.nome_editar = nome_editar
         self.linhas = []
         self.linha_selecionada = None
+        self._entrada_ativa: tk.Entry | None = None
 
         self.title("Criar Receita")
         self.geometry(GEOMETRIA_PADRAO)
@@ -35,7 +36,7 @@ class JanelaReceita(tk.Toplevel):
             self.campo_titulo.insert(0, nome_editar)
             self.campo_titulo.select_range(0, "end")
 
-        self.after(150, self.focar_entrada_inicial)
+        self.after(100, self.focar_entrada_inicial)
 
     # ── Montagem ──────────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ class JanelaReceita(tk.Toplevel):
             padx=20, 
             pady=16
             )
+        self._painel = p
+        self._registrar_captura_teclado(self, p)
 
         self.nome_receita(p)
 
@@ -94,27 +97,74 @@ class JanelaReceita(tk.Toplevel):
             relief="flat", 
             bd=0,
             highlightthickness=0,
+            exportselection=False,
             bg=t.COR_BRANCO, 
             fg=t.COR_AZUL_MARINHO,
+            insertbackground=t.COR_AZUL_MARINHO,
         )
         self.campo_titulo.pack(fill="x", padx=10, pady=8)
+        self._registrar_captura_teclado(borda)
         self._habilitar_toque_entrada(self.campo_titulo, borda)
 
     def focar_entrada_inicial(self) -> None:
         self.lift()
-        self.attributes("-topmost", True)
-        self.after(100, lambda: self.attributes("-topmost", False))
-        self.focus_force()
-        self.campo_titulo.focus_force()
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass
+        self._focar_entrada(self.campo_titulo)
 
-    @staticmethod
-    def _habilitar_toque_entrada(entry: tk.Entry, *containers: tk.Widget) -> None:
+    def _focar_entrada(self, entry: tk.Entry) -> None:
+        self._entrada_ativa = entry
+        entry.focus_set()
+        try:
+            entry.icursor(tk.END)
+        except tk.TclError:
+            pass
+
+    def _habilitar_toque_entrada(self, entry: tk.Entry, *containers: tk.Widget) -> None:
         def focar(_event=None):
-            entry.focus_force()
+            entry.after(80, lambda: self._focar_entrada(entry))
 
+        entry.bind(
+            "<FocusIn>",
+            lambda _e, campo=entry: setattr(self, "_entrada_ativa", campo),
+            add="+",
+        )
         for widget in (entry, *containers):
-            widget.bind("<Button-1>", focar, add="+")
             widget.bind("<ButtonRelease-1>", focar, add="+")
+
+    def _encaminhar_tecla(self, event: tk.Event):
+        """No Raspberry o teclado virtual às vezes envia teclas para a janela, não para o Entry."""
+        entry = self._entrada_ativa
+        if entry is None or not entry.winfo_exists():
+            return
+        if str(entry.cget("state")) == "disabled":
+            return
+        if event.widget is entry:
+            return
+
+        keysym = event.keysym
+        if keysym == "BackSpace":
+            try:
+                pos = entry.index(tk.INSERT)
+                if pos > 0:
+                    entry.delete(pos - 1)
+            except tk.TclError:
+                pass
+            return "break"
+        if keysym == "Delete":
+            try:
+                pos = entry.index(tk.INSERT)
+                if pos < len(entry.get()):
+                    entry.delete(pos)
+            except tk.TclError:
+                pass
+            return "break"
+
+        if event.char and event.char.isprintable():
+            entry.insert(tk.INSERT, event.char)
+            return "break"
 
     def btn_adicionar(self, parent):
         tk.Button(
@@ -229,6 +279,11 @@ class JanelaReceita(tk.Toplevel):
             "<Configure>",
             lambda e: self.canvas.itemconfig(self._janela_canvas, width=e.width),
         )
+        self._registrar_captura_teclado(self.canvas, self.container_linhas)
+
+    def _registrar_captura_teclado(self, *widgets: tk.Widget) -> None:
+        for widget in widgets:
+            widget.bind("<KeyPress>", self._encaminhar_tecla, add="+")
 
     def combo_box(self, parent, valor="", on_focus=None, linha_ref=None):
         estilo = ttk.Style()
@@ -271,6 +326,7 @@ class JanelaReceita(tk.Toplevel):
         entry = tk.Entry(
             frame, font=t.FONTE_NORMAL, relief="flat", bd=0,
             highlightthickness=0,
+            exportselection=False,
             bg=t.COR_BRANCO, fg=t.COR_AZUL_MARINHO, insertbackground=t.COR_AZUL_MARINHO,
             justify="center",
         )
@@ -362,6 +418,10 @@ class JanelaReceita(tk.Toplevel):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _fechar_janela(self):
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
         self.aplicacao.ao_fechar_receita()
         self.destroy()
 
@@ -374,7 +434,7 @@ class JanelaReceita(tk.Toplevel):
         self.linhas.clear()
         self.linha_selecionada = None
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        self.campo_titulo.focus_set()
+        self._focar_entrada(self.campo_titulo)
 
     def _coletar_passos(self) -> list[Step]:
         passos = []

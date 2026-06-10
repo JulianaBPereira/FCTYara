@@ -9,8 +9,10 @@ PAD_ITEM_X = 22
 PAD_ITEM_Y = 14
 LARGURA_MIN = 280
 INTERVALO_TOQUE = 0.28
+GRACA_APOS_ABRIR = 0.45
 
 _menu_aberto = None
+_barra_menu = None
 _ultimo_toque = 0.0
 _ultimo_clique_item = 0.0
 
@@ -23,12 +25,24 @@ def fechar_menu():
     _menu_aberto = None
 
 
+def _widget_na_barra(widget) -> bool:
+    if _barra_menu is None or widget is None:
+        return False
+    atual = widget
+    while atual is not None:
+        if atual == _barra_menu:
+            return True
+        atual = getattr(atual, "master", None)
+    return False
+
+
 class Submenu:
     def __init__(self, janela, itens):
         self.janela = janela
         self.itens = itens
         self.popup = None
         self._bind_fora = None
+        self._aberto_em = 0.0
 
     def aberto(self):
         if self.popup is None:
@@ -41,7 +55,6 @@ class Submenu:
     def fechar(self):
         if self._bind_fora:
             try:
-                self.janela.unbind("<Button-1>", self._bind_fora)
                 self.janela.unbind("<ButtonRelease-1>", self._bind_fora)
             except tk.TclError:
                 pass
@@ -83,11 +96,15 @@ class Submenu:
         popup.geometry(f"{largura}x{altura}+{x}+{y}")
         popup.deiconify()
         popup.attributes("-topmost", True)
-        popup.grab_set()
+        try:
+            popup.grab_set()
+        except tk.TclError:
+            pass
         popup.focus_force()
         self.popup = popup
+        self._aberto_em = time.monotonic()
 
-        self.janela.after(200, self._ouvir_clique_fora)
+        self.janela.after(350, self._ouvir_clique_fora)
 
     @staticmethod
     def _clique_dentro_popup(popup, widget) -> bool:
@@ -102,7 +119,11 @@ class Submenu:
         def fora(event):
             if _menu_aberto is not self or self.popup is None:
                 return
+            if time.monotonic() - self._aberto_em < GRACA_APOS_ABRIR:
+                return
             if self._clique_dentro_popup(self.popup, event.widget):
+                return
+            if _widget_na_barra(event.widget):
                 return
             fechar_menu()
 
@@ -199,15 +220,17 @@ def _montar_rotulo(barra, texto, menu):
     )
     rotulo.pack(side="left")
 
-    clicar = lambda e: _ao_clicar_rotulo(menu, rotulo)
-    rotulo.bind("<Button-1>", clicar)
-    rotulo.bind("<ButtonRelease-1>", clicar)
+    # Só ButtonRelease-1: no touch, pressionar + soltar abriam e fechavam o submenu.
+    rotulo.bind("<ButtonRelease-1>", lambda e: _ao_clicar_rotulo(menu, rotulo))
     rotulo.bind("<Enter>", lambda _: rotulo.config(bg=t.COR_CINZA_CLARO))
     rotulo.bind("<Leave>", lambda _: rotulo.config(bg=t.COR_BRANCO))
 
 
 def criar_menu_principal(janela, aplicacao):
+    global _barra_menu
+
     barra = tk.Frame(janela, bg=t.COR_BRANCO, highlightthickness=0)
+    _barra_menu = barra
     barra.pack(fill="x", side="top")
 
     tk.Frame(janela, bg=COR_BORDA, height=1).pack(fill="x", side="top")
