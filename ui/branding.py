@@ -79,13 +79,27 @@ def centralizar_janela(
     if largura is not None and altura is not None:
         janela.geometry(f"{largura}x{altura}")
     referencia.update_idletasks()
-    px, py = _posicao_centralizada(
-        janela,
-        referencia.winfo_rootx(),
-        referencia.winfo_rooty(),
-        referencia.winfo_width(),
-        referencia.winfo_height(),
-    )
+    ref_w = referencia.winfo_width()
+    ref_h = referencia.winfo_height()
+    # No Linux/X11, winfo_width/height pode retornar 1 quando o WM ainda não
+    # confirmou a geometria da janela (ConfigureNotify pendente). Nesse caso
+    # centraliza na tela para evitar posicionamento em (0, 0).
+    if ref_w <= 1 or ref_h <= 1:
+        px, py = _posicao_centralizada(
+            janela,
+            0,
+            0,
+            janela.winfo_screenwidth(),
+            janela.winfo_screenheight(),
+        )
+    else:
+        px, py = _posicao_centralizada(
+            janela,
+            referencia.winfo_rootx(),
+            referencia.winfo_rooty(),
+            ref_w,
+            ref_h,
+        )
     janela.geometry(f"+{px}+{py}")
 
 

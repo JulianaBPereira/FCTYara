@@ -29,9 +29,10 @@ def perguntar(
     _ALTURA = 220
     dlg.minsize(_LARGURA, _ALTURA)
     dlg.maxsize(_LARGURA, _ALTURA)
-    # overrideredirect definido antes da centralização para que o cálculo de
-    # posição já reflita a janela sem barra de título no Linux/X11.
+    # overrideredirect e transient definidos antes da centralização para que o
+    # cálculo de posição já reflita a janela sem barra de título no Linux/X11.
     dlg.overrideredirect(True)
+    dlg.transient(parent.winfo_toplevel())
 
     moldura = tk.Frame(dlg, bg=t.COR_PRIMARIA, padx=1, pady=1)
     moldura.pack(fill="both", expand=True)
@@ -121,6 +122,14 @@ def perguntar(
 
     dlg.deiconify()
     dlg.lift(parent)
+    # No Linux/X11, deiconify() é assíncrono: o servidor X ainda não mapeou a
+    # janela quando grab_set() é chamado na linha seguinte. wait_visibility()
+    # aguarda o VisibilityNotify do X11 antes de ativar o grab, evitando que o
+    # input fique capturado por uma janela invisível (freeze).
+    try:
+        dlg.wait_visibility()
+    except tk.TclError:
+        pass
     dlg.grab_set()
     dlg.focus_force()
     parent.wait_window(dlg)

@@ -68,6 +68,12 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
 
     dlg.deiconify()
     dlg.lift(janela_pai)
+    # No Linux/X11, deiconify() é assíncrono: aguarda o VisibilityNotify do
+    # X11 antes de ativar o grab para evitar freeze com janela invisível.
+    try:
+        dlg.wait_visibility()
+    except tk.TclError:
+        pass
     dlg.grab_set()
     dlg.focus_force()
     janela_pai.wait_window(dlg)
