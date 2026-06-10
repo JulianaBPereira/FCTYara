@@ -209,19 +209,16 @@ class AbaGeral:
                 pass
 
     def salvar(self):
+        porta = self.combo_porta.get()
         baud = int(self.combo_baud.get())
-        erro = SettingsService(
-            self.combo_porta.get(),
-            baud,
-            self.combo_receita.get(),
-        ).salvar_configuracao()
+        receita = self.combo_receita.get()
+        erro = SettingsService(porta, baud, receita).salvar_configuracao()
         if erro:
             mostrar_mensagem(self._painel_aba, "", erro, tipo="aviso")
             return
-        self.aplicacao.janela_principal.aplicar_configuracao(
-            self.combo_porta.get(),
-            baud,
-            self.combo_receita.get(),
-        )
         mostrar_mensagem(self._painel_aba, "", "Salvo com sucesso.")
         self._ao_fechar_janela()
+        # Aplica após fechar: conectar/receita atualiza a janela principal e
+        # rouba o foco; se isso ocorrer com o diálogo modal aberto (grab_set),
+        # a interface trava com o aviso atrás da janela principal.
+        self.aplicacao.janela_principal.aplicar_configuracao(porta, baud, receita)

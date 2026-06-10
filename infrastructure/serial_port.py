@@ -9,14 +9,57 @@ _TIMEOUT_RESPOSTA = 5
 
 _conexao: serial.Serial | None = None
 _fila: queue.Queue = queue.Queue()
+_fila_log: queue.Queue[tuple[str, str, str]] = queue.Queue()
+_fila_entrada: queue.Queue[str] = queue.Queue()
 _lendo = False
-_on_log = None
-_on_entrada = None  # callback(linha: str) — chamado para cada linha recebida
+_escutando_entrada = False
 
 
 def log(enviado: str = "", recebido: str = "", alerta: str = "") -> None:
-    if _on_log:
-        _on_log(enviado, recebido, alerta)
+    if enviado or recebido or alerta:
+        _fila_log.put((enviado, recebido, alerta))
+
+
+def drenar_logs() -> list[tuple[str, str, str]]:
+    itens: list[tuple[str, str, str]] = []
+    try:
+        while True:
+            itens.append(_fila_log.get_nowait())
+    except queue.Empty:
+        pass
+    return itens
+
+
+def iniciar_escuta_entrada() -> None:
+    global _escutando_entrada
+    _escutando_entrada = True
+    try:
+        while True:
+            _fila_entrada.get_nowait()
+    except queue.Empty:
+        pass
+
+
+def parar_escuta_entrada() -> None:
+    global _escutando_entrada
+    _escutando_entrada = False
+    try:
+        while True:
+            _fila_entrada.get_nowait()
+    except queue.Empty:
+        pass
+
+
+def drenar_entrada() -> list[str]:
+    if not _escutando_entrada:
+        return []
+    itens: list[str] = []
+    try:
+        while True:
+            itens.append(_fila_entrada.get_nowait())
+    except queue.Empty:
+        pass
+    return itens
 
 
 def _loop_leitura() -> None:
@@ -25,11 +68,8 @@ def _loop_leitura() -> None:
             linha = _conexao.readline().decode(errors="replace").strip()
             if linha and linha != "0":
                 _fila.put(linha)
-                if _on_entrada:
-                    try:
-                        _on_entrada(linha)
-                    except Exception:
-                        pass
+                if _escutando_entrada:
+                    _fila_entrada.put(linha)
         except Exception:
             break
 

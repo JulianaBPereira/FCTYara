@@ -1,4 +1,5 @@
 # Juliana Pereira | Delta Sollutions - 2026
+import queue
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -11,6 +12,7 @@ from services.execute_service import desligar_placa, executar
 from services.log_service import salvar_log
 from services.rastreio_service import carregar_config_rastreio, pasta_logs_efetiva
 from services.recipe_service import carregar_passos
+from services.settings_service import carregar_configuracao
 from ui.Avisos.confirmacao_popup import perguntar as perguntar_popup
 from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 from ui.Theme import theme as t
@@ -29,13 +31,14 @@ class JanelaPrincipal(tk.Tk):
     Layout (de cima para baixo):
         1. Menu
         2. Linha de estado  — conexão, porta, baud e receita ativa
-        3. Tabela           — colunas TESTE | RANGE | VALOR | STATUS
-        4. Botão            — Iniciar teste
+        3. Barcode          — campo de leitura com autofoco
+        4. Tabela           — colunas TESTE | RANGE | VALOR | STATUS
         5. Log serial       — TX/RX dos comandos
     """
 
     # Colunas da tabela na ordem em que aparecem
     COLUNAS = ("TESTE", "RANGE", "VALOR", "STATUS")
+    _COOLDOWN_APOS_TESTE_MS = 4000
 
     def __init__(self, aplicacao):
         super().__init__()
@@ -56,26 +59,40 @@ class JanelaPrincipal(tk.Tk):
         self._serial_atual: str = ""
         self._ids_linhas_tabela: list[str] = []
         self._labels_status: list[tk.Label] = []
+        self._fila_passos: queue.Queue[tuple[Step, dict]] = queue.Queue()
+        self._finalizar_after_id: str | None = None
+        self._aguardando_proximo = False
 
         self._montar_interface()
-        serial_port._on_log = self._exibir_log
+        self.after(100, self._processar_eventos_bg)
         centralizar_na_tela(self)
+        self.after(200, self._carregar_configuracao_salva)
+
+    def _carregar_configuracao_salva(self) -> None:
+        settings = carregar_configuracao()
+        if settings and settings.channelAPort and settings.channelABaud and settings.channelARecipe:
+            self.aplicar_configuracao(
+                settings.channelAPort,
+                settings.channelABaud,
+                settings.channelARecipe,
+            )
 
     # ── Montagem ──────────────────────────────────────────────────────────────
 
     def _montar_interface(self):
         criar_menu_principal(self, self.aplicacao)
 
-        # Painel raiz: row 0 = estado, row 1 = tabela (cresce), row 2 = botão
+        # Painel raiz: row 0 = estado, row 1 = barcode, row 2 = tabela (cresce)
         painel = tk.Frame(self, bg=t.COR_BRANCO)
         painel.pack(fill="both", expand=True, padx=16, pady=8)
         painel.grid_columnconfigure(0, weight=1)
-        painel.grid_rowconfigure(1, weight=1)
+        painel.grid_rowconfigure(2, weight=1)
 
         self._montar_linha_estado(painel)
+        self._montar_campo_barcode(painel)
         self._montar_tabela(painel)
-        self._montar_botao_iniciar(painel)
         self._montar_log_serial(painel)
+        self.after(50, self._focar_campo_barcode)
 
     # ── 1. Linha de estado ────────────────────────────────────────────────────
 
@@ -178,6 +195,7 @@ class JanelaPrincipal(tk.Tk):
             for passo in receita_obj.steps
         ]
         self.carregar_testes(testes)
+        self.after(50, self._focar_campo_barcode)
 
     # ── 2. Tabela ─────────────────────────────────────────────────────────────
 
@@ -192,7 +210,7 @@ class JanelaPrincipal(tk.Tk):
 
     def _montar_tabela(self, painel):
         frame = tk.Frame(painel, bg=t.COR_BRANCO)
-        frame.grid(row=1, column=0, sticky="nsew")
+        frame.grid(row=2, column=0, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
 
@@ -458,25 +476,103 @@ class JanelaPrincipal(tk.Tk):
     def _on_mousewheel(self, event) -> None:
         self.tabela.yview_scroll(-1 * (event.delta // 120), "units")
 
-    # ── 3. Botão Iniciar teste ────────────────────────────────────────────────
+    # ── 3. Campo de leitura de barcode ────────────────────────────────────────
 
-    def _montar_botao_iniciar(self, painel):
-        self.botao_iniciar = tk.Button(
-            painel,
-            text="Ler Barcode",
-            font=t.FONTE_BOLD,
-            bg=t.COR_AZUL_MARINHO,
-            fg="white",
-            activebackground=t.COR_AZUL_MARINHO_HOVER,
-            activeforeground="white",
-            relief="flat",
-            cursor="hand2",
-            bd=0,
-            padx=16,
-            pady=20,
+    _PLACEHOLDER_BARCODE = ""
+    _COR_PLACEHOLDER_BARCODE = "#94a3b8"
+
+    def _montar_campo_barcode(self, painel):
+        linha = tk.Frame(painel, bg=t.COR_BRANCO)
+        linha.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        linha.grid_columnconfigure(0, weight=1)
+
+        borda = tk.Frame(
+            linha,
+            bg=t.COR_BRANCO,
+            highlightthickness=1,
+            highlightbackground=t.COR_PRIMARIA,
         )
-        self.botao_iniciar.configure(command=self._iniciar_teste)
-        self.botao_iniciar.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        borda.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+
+        self._barcode_placeholder_ativo = True
+        self._campo_barcode = tk.Entry(
+            borda,
+            font=t.FONTE_NORMAL,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            bg=t.COR_BRANCO,
+            fg=self._COR_PLACEHOLDER_BARCODE,
+            insertbackground=t.COR_AZUL_MARINHO,
+        )
+        self._campo_barcode.pack(fill="x", padx=10, pady=8)
+        self._campo_barcode.insert(0, self._PLACEHOLDER_BARCODE)
+
+        self._campo_barcode.bind("<FocusIn>", self._ao_focar_campo_barcode)
+        self._campo_barcode.bind("<FocusOut>", self._ao_desfocar_campo_barcode)
+        self._campo_barcode.bind("<Key>", self._ao_digitar_campo_barcode)
+        self._campo_barcode.bind("<Return>", self._ao_confirmar_barcode_campo)
+        self._campo_barcode.bind("<KP_Enter>", self._ao_confirmar_barcode_campo)
+
+        tk.Label(
+            linha,
+            text="Leitura do barcode",
+            font=t.FONTE_BOLD,
+            bg=t.COR_BRANCO,
+            fg=t.COR_AZUL_MARINHO,
+        ).grid(row=0, column=1, sticky="e")
+
+    def _focar_campo_barcode(self) -> None:
+        if not self.winfo_exists():
+            return
+        try:
+            if str(self._campo_barcode.cget("state")) == "disabled":
+                return
+        except tk.TclError:
+            return
+        self._campo_barcode.focus_set()
+        self._ao_focar_campo_barcode()
+
+    def _ao_focar_campo_barcode(self, _event=None) -> None:
+        if self._barcode_placeholder_ativo:
+            self._campo_barcode.delete(0, "end")
+            self._campo_barcode.configure(fg=t.COR_AZUL_MARINHO)
+            self._barcode_placeholder_ativo = False
+
+    def _ao_digitar_campo_barcode(self, event=None) -> None:
+        if not self._barcode_placeholder_ativo:
+            return
+        if event and event.char and event.char.isprintable():
+            self._campo_barcode.delete(0, "end")
+            self._campo_barcode.configure(fg=t.COR_AZUL_MARINHO)
+            self._barcode_placeholder_ativo = False
+
+    def _ao_desfocar_campo_barcode(self, _event=None) -> None:
+        if not self._campo_barcode.get().strip():
+            self._mostrar_placeholder_barcode()
+
+    def _mostrar_placeholder_barcode(self) -> None:
+        self._campo_barcode.delete(0, "end")
+        self._campo_barcode.insert(0, self._PLACEHOLDER_BARCODE)
+        self._campo_barcode.configure(fg=self._COR_PLACEHOLDER_BARCODE)
+        self._barcode_placeholder_ativo = True
+
+    def _valor_campo_barcode(self) -> str:
+        texto = self._campo_barcode.get().strip()
+        if self._barcode_placeholder_ativo or texto == self._PLACEHOLDER_BARCODE:
+            return ""
+        return texto
+
+    def _limpar_campo_barcode(self, *, focar: bool = True) -> None:
+        self._mostrar_placeholder_barcode()
+        if focar:
+            self._focar_campo_barcode()
+
+    def _definir_campo_barcode_habilitado(self, habilitado: bool) -> None:
+        estado = "normal" if habilitado else "disabled"
+        self._campo_barcode.config(state=estado)
+        if habilitado:
+            self.after(50, self._focar_campo_barcode)
 
     def _montar_log_serial(self, painel):
         linha = tk.Frame(painel, bg=t.COR_BRANCO)
@@ -509,10 +605,22 @@ class JanelaPrincipal(tk.Tk):
         )
         self._label_alerta.pack(side="right")
 
-    def _exibir_log(self, enviado: str, recebido: str, alerta: str = "") -> None:
+    def _processar_eventos_bg(self) -> None:
         if not self.winfo_exists():
             return
-        self.after(0, lambda: self._atualizar_log(enviado, recebido, alerta))
+        for enviado, recebido, alerta in serial_port.drenar_logs():
+            self._atualizar_log(enviado, recebido, alerta)
+        while True:
+            try:
+                passo, resultado = self._fila_passos.get_nowait()
+            except queue.Empty:
+                break
+            self._passo_comando_concluido(passo, resultado)
+        for linha in serial_port.drenar_entrada():
+            if linha.strip().lower() == "start":
+                self._ao_receber_start()
+                break
+        self.after(100, self._processar_eventos_bg)
 
     def _atualizar_log(self, enviado: str, recebido: str, alerta: str = "") -> None:
         if enviado:
@@ -565,13 +673,17 @@ class JanelaPrincipal(tk.Tk):
             self._aplicar_estilo_status(indice, "—")
         self.after_idle(self._posicionar_labels_status)
 
-    def _iniciar_teste(self) -> None:
-        if not self._receita_ativa or not self._receita_ativa.steps:
-            mostrar_mensagem(
-                self, "Teste", "Nenhuma receita ativa para executar.", tipo="aviso",
-            )
-            return
+    def _cancelar_cooldown_finalizacao(self) -> None:
+        if self._finalizar_after_id is not None:
+            try:
+                self.after_cancel(self._finalizar_after_id)
+            except ValueError:
+                pass
+            self._finalizar_after_id = None
+        self._aguardando_proximo = False
 
+    def _preparar_novo_teste(self) -> None:
+        self._cancelar_cooldown_finalizacao()
         self._parar_aguardar_bimanual()
         self._indice_passo = 0
         self._serial_atual = ""
@@ -579,12 +691,36 @@ class JanelaPrincipal(tk.Tk):
         self._var_recebido.set("")
         self._label_alerta.config(text="")
         self._reiniciar_resultados_tabela()
-        self._executar_barcode()
 
-    def _executar_barcode(self) -> None:
+    def _ciclo_anterior_finalizado(self) -> bool:
+        if not self._receita_ativa:
+            return False
+        return self._indice_passo >= len(self._receita_ativa.steps)
+
+    def _pode_ler_novo_barcode(self) -> bool:
+        if self._aguardando_proximo:
+            return False
+        if self._indice_passo == 0:
+            return True
+        return self._ciclo_anterior_finalizado()
+
+    def _ao_confirmar_barcode_campo(self, _event=None) -> str:
+        codigo = self._valor_campo_barcode()
+        if not codigo:
+            return "break"
+
         if not self._receita_ativa or not self._receita_ativa.steps:
-            return
-        self.aplicacao.abrir_barcode(on_ler=self._ao_ler_barcode)
+            mostrar_mensagem(
+                self, "Teste", "Nenhuma receita ativa para executar.", tipo="aviso",
+            )
+            return "break"
+
+        if not self._pode_ler_novo_barcode():
+            return "break"
+
+        self._preparar_novo_teste()
+        self._processar_barcode(codigo)
+        return "break"
 
     def _coletar_resultados(self) -> list[dict]:
         resultados = []
@@ -665,7 +801,7 @@ class JanelaPrincipal(tk.Tk):
 
     def _passo_comando_bg(self, passo: Step) -> None:
         resultado = executar(passo)
-        self.after(0, lambda: self._passo_comando_concluido(passo, resultado))
+        self._fila_passos.put((passo, resultado))
 
     def _passo_comando_concluido(self, passo: Step, resultado: dict) -> None:
         if passo.command.strip() == "4":
@@ -711,21 +847,17 @@ class JanelaPrincipal(tk.Tk):
 
     def _aguardar_bimanual(self) -> None:
         """Ativa o listener serial e aguarda o sinal 'start' do bimanual."""
-        serial_port._on_entrada = self._ao_receber_entrada_serial
+        serial_port.iniciar_escuta_entrada()
+        self._definir_campo_barcode_habilitado(False)
         self._label_alerta.config(text="Aguardando bimanual...")
 
     def _parar_aguardar_bimanual(self) -> None:
-        serial_port._on_entrada = None
-
-    def _ao_receber_entrada_serial(self, linha: str) -> None:
-        """Chamado pelo thread de leitura serial — agenda no thread principal."""
-        if linha.strip().lower() == "start":
-            self.after(0, self._ao_receber_start)
+        serial_port.parar_escuta_entrada()
 
     def _ao_receber_start(self) -> None:
         """Recebeu 'start' do bimanual: inicia os testes."""
         self._parar_aguardar_bimanual()
-        self.botao_iniciar.config(state="disabled")
+        self._definir_campo_barcode_habilitado(False)
         self._atualizar_log("", "BIMANUAL_ON")
         self._label_alerta.config(text="Iniciando testes", fg=t.COR_VERDE)
         self.after(1500, lambda: self._label_alerta.config(text="", fg=t.COR_VERMELHO))
@@ -735,23 +867,47 @@ class JanelaPrincipal(tk.Tk):
 
     def _finalizar_lote(self) -> None:
         self._parar_aguardar_bimanual()
-        self.botao_iniciar.config(state="normal")
+        self._definir_campo_barcode_habilitado(False)
         self._salvar_log()
         if self._tem_falha_apos_barcode():
             threading.Thread(target=self._desligar_placa_bg, daemon=True).start()
+        self._cancelar_cooldown_finalizacao()
+        self._aguardando_proximo = True
+        self._finalizar_after_id = self.after(
+            self._COOLDOWN_APOS_TESTE_MS,
+            self._iniciar_proximo_teste,
+        )
+
+    def _iniciar_proximo_teste(self) -> None:
+        self._finalizar_after_id = None
+        self._aguardando_proximo = False
+        self._preparar_novo_teste()
+        self._mostrar_placeholder_barcode()
+        self._definir_campo_barcode_habilitado(True)
+
+    def _limpar_tabela_apos_barcode_fail(self) -> None:
+        self._finalizar_after_id = None
+        if self._indice_passo != 0:
+            return
+        self._reiniciar_resultados_tabela()
+        self._var_enviado.set("")
+        self._var_recebido.set("")
+        self._label_alerta.config(text="")
 
     def _desligar_placa_bg(self) -> None:
         desligar_placa()
 
-    def _ao_ler_barcode(self, codigo: str) -> None:
+    def _processar_barcode(self, codigo: str) -> None:
         if not self._receita_ativa or self._indice_passo != 0:
             return
         passo = self._receita_ativa.steps[0]
         status = BarcodeService(codigo).CompararBarcode(passo.expectedValue)
         self._atualizar_linha_teste(0, codigo, status)
+        self._limpar_campo_barcode(focar=False)
         if status == t.STATUS_PASS:
             self._serial_atual = codigo
             self._indice_passo = 1
+            self._definir_campo_barcode_habilitado(False)
             self._aguardar_bimanual()
             return
         mostrar_mensagem(
@@ -761,3 +917,9 @@ class JanelaPrincipal(tk.Tk):
             f"Código esperado: {passo.expectedValue}",
             tipo="aviso",
         )
+        self._cancelar_cooldown_finalizacao()
+        self._finalizar_after_id = self.after(
+            self._COOLDOWN_APOS_TESTE_MS,
+            self._limpar_tabela_apos_barcode_fail,
+        )
+        self.after(50, self._focar_campo_barcode)

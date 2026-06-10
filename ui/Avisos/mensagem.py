@@ -41,6 +41,10 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
     ).pack(pady=(0, 24))
 
     def fechar():
+        try:
+            dlg.attributes("-topmost", False)
+        except tk.TclError:
+            pass
         dlg.grab_release()
         dlg.destroy()
 
@@ -68,6 +72,10 @@ def mostrar(parent, titulo: str, mensagem: str, tipo: str = "info") -> None:
 
     dlg.deiconify()
     dlg.lift(janela_pai)
+    try:
+        dlg.attributes("-topmost", True)
+    except tk.TclError:
+        pass
     # No Linux/X11, deiconify() é assíncrono: aguarda o VisibilityNotify do
     # X11 antes de ativar o grab para evitar freeze com janela invisível.
     try:

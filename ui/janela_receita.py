@@ -41,64 +41,107 @@ class JanelaReceita(tk.Toplevel):
     # ── Montagem ──────────────────────────────────────────────────────────────
 
     def _montar_interface(self):
-        p = tk.Frame(self, bg=t.COR_BRANCO)
-        p.pack(
-            fill="both", 
-            expand=True,
-            padx=20, 
-            pady=16
-            )
-        self._painel = p
-        self._registrar_captura_teclado(self, p)
-
-        self.nome_receita(p)
-
-        barra = tk.Frame(p, bg=t.COR_BRANCO)
-        barra.pack(
-            fill="x", 
-            pady=(0, 6)
-            )
-        self.btn_adicionar(barra)
-        self.btn_remover(barra)
-
-        # Rodapé empacotado antes da tabela para garantir visibilidade
-        rodape = tk.Frame(p, bg=t.COR_BRANCO)
-        rodape.pack(
-            fill="x", 
-            side="bottom", 
-            pady=(8, 0))
+        # Rodapé fixo (Salvar / Cancelar) fora do scroll para sempre ficar visível
+        rodape = tk.Frame(self, bg=t.COR_BRANCO)
+        rodape.pack(fill="x", side="bottom", padx=20, pady=(8, 12))
         self.btn_cancelar(rodape)
         self.btn_salvar(rodape)
 
+        tk.Frame(self, bg="#eef1f5", height=1).pack(fill="x", side="bottom")
+
+        # Canvas principal com scroll vertical — contém TODO o restante
+        outer = tk.Frame(self, bg=t.COR_BRANCO)
+        outer.pack(fill="both", expand=True)
+
+        sb = ttk.Scrollbar(outer, orient="vertical")
+        sb.pack(side="right", fill="y")
+
+        self._canvas_principal = tk.Canvas(
+            outer,
+            bg=t.COR_BRANCO,
+            highlightthickness=0,
+            yscrollcommand=sb.set,
+        )
+        self._canvas_principal.pack(side="left", fill="both", expand=True)
+        sb.configure(command=self._canvas_principal.yview)
+
+        p = tk.Frame(self._canvas_principal, bg=t.COR_BRANCO)
+        self._id_janela_canvas = self._canvas_principal.create_window(
+            (0, 0), window=p, anchor="nw"
+        )
+
+        # Espaçador fixo no fim do conteúdo — garante scroll mesmo com poucos itens
+        # (equivale à altura aproximada do teclado virtual no Raspberry Pi)
+        self._espacador_teclado = tk.Frame(p, bg=t.COR_BRANCO, height=300)
+        self._espacador_teclado.pack(fill="x", side="bottom")
+
+        p.bind(
+            "<Configure>",
+            lambda e: self._canvas_principal.configure(
+                scrollregion=self._canvas_principal.bbox("all")
+            ),
+        )
+        self._canvas_principal.bind(
+            "<Configure>",
+            lambda e: self._canvas_principal.itemconfig(
+                self._id_janela_canvas, width=e.width
+            ),
+        )
+
+        # Scroll com roda do mouse
+        self._canvas_principal.bind("<MouseWheel>", self._ao_rolar_mouse)
+        self._canvas_principal.bind("<Button-4>", self._ao_rolar_mouse)
+        self._canvas_principal.bind("<Button-5>", self._ao_rolar_mouse)
+
+        self._painel = p
+        self._registrar_captura_teclado(self, p, self._canvas_principal)
+
+        # Conteúdo interno
+        p.configure(padx=20, pady=16)
+        self.nome_receita(p)
+
+        barra = tk.Frame(p, bg=t.COR_BRANCO)
+        barra.pack(fill="x", pady=(0, 6))
+        self.btn_adicionar(barra)
+        self.btn_remover(barra)
+
         self.tabela_testes(p)
+
+    def _ao_rolar_mouse(self, event):
+        if event.num == 4:
+            self._canvas_principal.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self._canvas_principal.yview_scroll(1, "units")
+        else:
+            self._canvas_principal.yview_scroll(int(-event.delta / 120), "units")
 
     # ── Widgets ───────────────────────────────────────────────────────────────
 
     def nome_receita(self, parent):
         tk.Label(
-            parent, 
-            text="Título da receita", 
+            parent,
+            text="Título da receita",
             font=t.FONTE_BOLD,
-            bg=t.COR_BRANCO, 
+            bg=t.COR_BRANCO,
             fg=t.COR_AZUL_MARINHO,
         ).pack(anchor="w", pady=(0, 4))
 
         borda = tk.Frame(
-            parent, 
+            parent,
             bg=t.COR_BRANCO,
-            highlightthickness=1, 
-            highlightbackground=t.COR_PRIMARIA
-            )
+            highlightthickness=1,
+            highlightbackground=t.COR_PRIMARIA,
+        )
         borda.pack(fill="x", pady=(0, 8))
 
         self.campo_titulo = tk.Entry(
-            borda, 
-            font=t.FONTE_NORMAL, 
-            relief="flat", 
+            borda,
+            font=t.FONTE_NORMAL,
+            relief="flat",
             bd=0,
             highlightthickness=0,
             exportselection=False,
-            bg=t.COR_BRANCO, 
+            bg=t.COR_BRANCO,
             fg=t.COR_AZUL_MARINHO,
             insertbackground=t.COR_AZUL_MARINHO,
         )
@@ -122,9 +165,34 @@ class JanelaReceita(tk.Toplevel):
         except tk.TclError:
             pass
 
+    def _rolar_para_entry(self, entry: tk.Entry) -> None:
+        """Rola o canvas para que o campo fique visível acima do teclado virtual."""
+        self.update_idletasks()
+        try:
+            # Posição Y do widget em relação ao frame interno (_painel)
+            y_abs = entry.winfo_rooty()
+            y_painel = self._painel.winfo_rooty()
+            y_relativo = y_abs - y_painel
+
+            altura_canvas = self._canvas_principal.winfo_height()
+            altura_conteudo = self._painel.winfo_reqheight()
+
+            if altura_conteudo <= altura_canvas:
+                return
+
+            # Deixa o campo com uma margem de 80px do topo
+            alvo = max(0, y_relativo - 80)
+            fracao = alvo / altura_conteudo
+            self._canvas_principal.yview_moveto(fracao)
+        except tk.TclError:
+            pass
+
     def _habilitar_toque_entrada(self, entry: tk.Entry, *containers: tk.Widget) -> None:
         def focar(_event=None):
-            entry.after(80, lambda: self._focar_entrada(entry))
+            def _fazer():
+                self._focar_entrada(entry)
+                self._rolar_para_entry(entry)
+            entry.after(80, _fazer)
 
         entry.bind(
             "<FocusIn>",
@@ -169,65 +237,65 @@ class JanelaReceita(tk.Toplevel):
     def btn_adicionar(self, parent):
         tk.Button(
             parent, text="+ Adicionar linha",
-            font=t.FONTE_BOLD, 
-            bg=t.COR_AZUL_MARINHO, 
+            font=t.FONTE_BOLD,
+            bg=t.COR_AZUL_MARINHO,
             fg="white",
-            activebackground=t.COR_AZUL_MARINHO_HOVER, 
+            activebackground=t.COR_AZUL_MARINHO_HOVER,
             activeforeground="white",
-            relief="flat", 
-            cursor="hand2", 
-            bd=0, padx=14, 
+            relief="flat",
+            cursor="hand2",
+            bd=0, padx=14,
             pady=6,
             command=self._adicionar_linha,
         ).pack(side="left", padx=(0, 8))
 
     def btn_remover(self, parent):
         tk.Button(
-            parent, 
+            parent,
             text="− Remover linha",
-            font=t.FONTE_BOLD, 
-            bg=t.COR_AZUL_MARINHO, 
+            font=t.FONTE_BOLD,
+            bg=t.COR_AZUL_MARINHO,
             fg="white",
-            activebackground=t.COR_AZUL_MARINHO_HOVER, 
+            activebackground=t.COR_AZUL_MARINHO_HOVER,
             activeforeground="white",
-            relief="flat", 
-            cursor="hand2", 
-            bd=0, 
-            padx=14, 
+            relief="flat",
+            cursor="hand2",
+            bd=0,
+            padx=14,
             pady=6,
             command=self._remover_linha_selecionada,
         ).pack(side="left")
 
     def btn_salvar(self, parent):
         tk.Button(
-            parent, 
+            parent,
             text="Salvar",
-            font=t.FONTE_NORMAL, 
-            bg=t.COR_AZUL_MARINHO, 
+            font=t.FONTE_NORMAL,
+            bg=t.COR_AZUL_MARINHO,
             fg="white",
-            activebackground=t.COR_AZUL_MARINHO_HOVER, 
+            activebackground=t.COR_AZUL_MARINHO_HOVER,
             activeforeground="white",
-            relief="flat", 
-            cursor="hand2", 
-            bd=0, 
-            padx=14, 
+            relief="flat",
+            cursor="hand2",
+            bd=0,
+            padx=14,
             pady=6,
             command=self._salvar_receita,
         ).pack(side="right")
 
     def btn_cancelar(self, parent):
         tk.Button(
-            parent, 
+            parent,
             text="Cancelar",
-            font=t.FONTE_NORMAL, 
-            bg=t.COR_AZUL_MARINHO, 
+            font=t.FONTE_NORMAL,
+            bg=t.COR_AZUL_MARINHO,
             fg="white",
-            activebackground=t.COR_AZUL_MARINHO_HOVER, 
+            activebackground=t.COR_AZUL_MARINHO_HOVER,
             activeforeground="white",
-            relief="flat", 
-            cursor="hand2", 
-            bd=0, 
-            padx=14, 
+            relief="flat",
+            cursor="hand2",
+            bd=0,
+            padx=14,
             pady=6,
             command=self._fechar_janela,
         ).pack(side="right", padx=(6, 0))
@@ -241,45 +309,20 @@ class JanelaReceita(tk.Toplevel):
         cab.pack(fill="x")
         for texto in ("NOME DO TESTE", "TIPO", "COMANDO", "VALOR ESPERADO"):
             tk.Label(
-                cab, 
-                text=texto, 
+                cab,
+                text=texto,
                 font=t.FONTE_BOLD,
-                bg=t.COR_BRANCO, 
+                bg=t.COR_BRANCO,
                 fg=t.COR_PRIMARIA,
             ).pack(side="left", expand=True, padx=4, pady=8)
 
         tk.Frame(container, bg=t.COR_PRIMARIA, height=1).pack(fill="x", pady=(0, 8))
 
-        # Área rolável
-        frame_scroll = tk.Frame(container, bg=t.COR_BRANCO)
-        frame_scroll.pack(fill="both", expand=True)
+        # Linhas diretamente no frame (sem Canvas interno — o scroll principal cobre tudo)
+        self.container_linhas = tk.Frame(container, bg=t.COR_BRANCO)
+        self.container_linhas.pack(fill="both", expand=True)
 
-        self.canvas = tk.Canvas(
-            frame_scroll,
-            bg=t.COR_BRANCO,
-            highlightthickness=0,
-            takefocus=0,
-        )
-        self.canvas.pack(side="left", fill="both", expand=True)
-
-        sb = ttk.Scrollbar(frame_scroll, orient="vertical", command=self.canvas.yview)
-        sb.pack(side="right", fill="y")
-        self.canvas.configure(yscrollcommand=sb.set)
-
-        self.container_linhas = tk.Frame(self.canvas, bg=t.COR_BRANCO)
-        self._janela_canvas = self.canvas.create_window(
-            (0, 0), window=self.container_linhas, anchor="nw",
-        )
-
-        self.container_linhas.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
-        )
-        self.canvas.bind(
-            "<Configure>",
-            lambda e: self.canvas.itemconfig(self._janela_canvas, width=e.width),
-        )
-        self._registrar_captura_teclado(self.canvas, self.container_linhas)
+        self._registrar_captura_teclado(self.container_linhas)
 
     def _registrar_captura_teclado(self, *widgets: tk.Widget) -> None:
         for widget in widgets:
@@ -314,9 +357,14 @@ class JanelaReceita(tk.Toplevel):
 
         frame = tk.Frame(parent, bg=t.COR_BRANCO)
         cb = ttk.Combobox(frame, values=t.TIPOS_TESTE, state="readonly",
-                          justify="center", style="Flat.TCombobox", width=10)
+                          justify="center", style="Flat.TCombobox", width=12,
+                          font=t.FONTE_NORMAL)
         cb.set(valor)
-        cb.pack(anchor="center", ipady=6)
+        # Itens da lista suspensa grandes para fácil toque no Raspberry Pi
+        cb.option_add("*TCombobox*Listbox.font", (t.FONTE_NORMAL[0], 20))
+        cb.option_add("*TCombobox*Listbox.selectBackground", t.COR_AZUL_MARINHO)
+        cb.option_add("*TCombobox*Listbox.selectForeground", t.COR_BRANCO)
+        cb.pack(anchor="center", ipady=8)
         cb.bind("<FocusIn>", lambda e: (on_focus and on_focus(), linha_ref and linha_ref.configure(bg=t.COR_AZUL_MARINHO)))
         cb.bind("<FocusOut>", lambda e: linha_ref and linha_ref.configure(bg=t.COR_CINZA_CLARO))
         return frame, cb
@@ -353,9 +401,9 @@ class JanelaReceita(tk.Toplevel):
         nome="Passo",
         tipo="Serial",
         comando_val="",
-        ValorEsperado_val="F9A3",
+        ValorEsperado_val="",
     ):
-        dados = {}  # dict mutável — os lambdas abaixo capturam a referência
+        dados = {}
 
         linha_frame = tk.Frame(self.container_linhas, bg=t.COR_BRANCO)
         linha_frame.pack(fill="x", pady=(0, 4))
@@ -365,7 +413,6 @@ class JanelaReceita(tk.Toplevel):
 
         selecionar = lambda: self._selecionar_linha(dados)
 
-        # Linha única contínua no fundo de toda a linha
         linha_ativa = tk.Frame(linha_frame, bg=t.COR_CINZA_CLARO, height=1)
         linha_ativa.pack(fill="x", pady=(4, 0))
 
@@ -404,7 +451,11 @@ class JanelaReceita(tk.Toplevel):
         })
         self.linhas.append(dados)
 
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        # Atualiza o scroll do canvas principal
+        self._painel.update_idletasks()
+        self._canvas_principal.configure(
+            scrollregion=self._canvas_principal.bbox("all")
+        )
 
     def _selecionar_linha(self, dados):
         self.linha_selecionada = dados
@@ -415,7 +466,9 @@ class JanelaReceita(tk.Toplevel):
         self.linha_selecionada["frame"].destroy()
         self.linhas.remove(self.linha_selecionada)
         self.linha_selecionada = None
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self._canvas_principal.configure(
+            scrollregion=self._canvas_principal.bbox("all")
+        )
 
     def _fechar_janela(self):
         try:
@@ -433,7 +486,9 @@ class JanelaReceita(tk.Toplevel):
             linha["frame"].destroy()
         self.linhas.clear()
         self.linha_selecionada = None
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self._canvas_principal.configure(
+            scrollregion=self._canvas_principal.bbox("all")
+        )
         self._focar_entrada(self.campo_titulo)
 
     def _coletar_passos(self) -> list[Step]:

@@ -61,10 +61,6 @@ class Submenu:
             self._bind_fora = None
         if self.popup:
             try:
-                self.popup.grab_release()
-            except tk.TclError:
-                pass
-            try:
                 self.popup.destroy()
             except tk.TclError:
                 pass
@@ -96,11 +92,6 @@ class Submenu:
         popup.geometry(f"{largura}x{altura}+{x}+{y}")
         popup.deiconify()
         popup.attributes("-topmost", True)
-        try:
-            popup.grab_set()
-        except tk.TclError:
-            pass
-        popup.focus_force()
         self.popup = popup
         self._aberto_em = time.monotonic()
 
