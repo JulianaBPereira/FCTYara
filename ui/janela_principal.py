@@ -875,6 +875,23 @@ class JanelaPrincipal(tk.Tk):
         self._var_enviado.set("")
         self._var_recebido.set("")
         self._label_alerta.config(text="")
+        self._mostrar_placeholder_barcode()
+        self.after(50, self._focar_campo_barcode)
+
+    def _exibir_aviso_barcode_incorreto(self, codigo_esperado: str) -> None:
+        mostrar_mensagem(
+            self,
+            "Código incorreto",
+            "O código lido não corresponde à receita ativa.\n\n"
+            f"Código esperado: {codigo_esperado}",
+            tipo="aviso",
+        )
+        self._cancelar_cooldown_finalizacao()
+        self._finalizar_after_id = self.after(
+            self._COOLDOWN_APOS_TESTE_MS,
+            self._limpar_tabela_apos_barcode_fail,
+        )
+        self.after(50, self._focar_campo_barcode)
 
     def _desligar_placa_bg(self) -> None:
         desligar_placa()
@@ -892,16 +909,5 @@ class JanelaPrincipal(tk.Tk):
             self._definir_campo_barcode_habilitado(False)
             self._aguardar_bimanual()
             return
-        mostrar_mensagem(
-            self,
-            "Código incorreto",
-            f"O código lido não corresponde à receita ativa.\n\n"
-            f"Código esperado: {passo.expectedValue}",
-            tipo="aviso",
-        )
-        self._cancelar_cooldown_finalizacao()
-        self._finalizar_after_id = self.after(
-            self._COOLDOWN_APOS_TESTE_MS,
-            self._limpar_tabela_apos_barcode_fail,
-        )
-        self.after(50, self._focar_campo_barcode)
+        codigo_esperado = passo.expectedValue
+        self.after(0, lambda: self._exibir_aviso_barcode_incorreto(codigo_esperado))
