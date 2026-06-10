@@ -12,6 +12,7 @@ INTERVALO_TOQUE = 0.28
 
 _menu_aberto = None
 _ultimo_toque = 0.0
+_ultimo_clique_item = 0.0
 
 
 def fechar_menu():
@@ -41,10 +42,15 @@ class Submenu:
         if self._bind_fora:
             try:
                 self.janela.unbind("<Button-1>", self._bind_fora)
+                self.janela.unbind("<ButtonRelease-1>", self._bind_fora)
             except tk.TclError:
                 pass
             self._bind_fora = None
         if self.popup:
+            try:
+                self.popup.grab_release()
+            except tk.TclError:
+                pass
             try:
                 self.popup.destroy()
             except tk.TclError:
@@ -77,22 +83,30 @@ class Submenu:
         popup.geometry(f"{largura}x{altura}+{x}+{y}")
         popup.deiconify()
         popup.attributes("-topmost", True)
+        popup.grab_set()
+        popup.focus_force()
         self.popup = popup
 
         self.janela.after(200, self._ouvir_clique_fora)
+
+    @staticmethod
+    def _clique_dentro_popup(popup, widget) -> bool:
+        atual = widget
+        while atual is not None:
+            if atual == popup:
+                return True
+            atual = getattr(atual, "master", None)
+        return False
 
     def _ouvir_clique_fora(self):
         def fora(event):
             if _menu_aberto is not self or self.popup is None:
                 return
-            x1 = self.popup.winfo_rootx()
-            y1 = self.popup.winfo_rooty()
-            x2 = x1 + self.popup.winfo_width()
-            y2 = y1 + self.popup.winfo_height()
-            if not (x1 <= event.x_root < x2 and y1 <= event.y_root < y2):
-                fechar_menu()
+            if self._clique_dentro_popup(self.popup, event.widget):
+                return
+            fechar_menu()
 
-        self._bind_fora = self.janela.bind("<Button-1>", fora, add="+")
+        self._bind_fora = self.janela.bind("<ButtonRelease-1>", fora, add="+")
 
     def _montar_item(self, lista, item):
         comando = item.get("command")
@@ -124,12 +138,19 @@ class Submenu:
             ).pack(side="right")
 
         def clicar(_event=None):
+            global _ultimo_clique_item
+
             if comando is None:
                 return
-            if self.popup is None:
+
+            agora = time.monotonic()
+            if agora - _ultimo_clique_item < INTERVALO_TOQUE:
                 return
+            _ultimo_clique_item = agora
+
+            cmd = comando
             fechar_menu()
-            comando()
+            cmd()
 
         def hover(entra):
             cor = t.COR_MENU_HOVER if entra else t.COR_BRANCO
