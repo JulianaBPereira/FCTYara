@@ -463,7 +463,7 @@ class JanelaPrincipal(tk.Tk):
     def _montar_botao_iniciar(self, painel):
         self.botao_iniciar = tk.Button(
             painel,
-            text="Iniciar Teste",
+            text="Ler Barcode",
             font=t.FONTE_BOLD,
             bg=t.COR_AZUL_MARINHO,
             fg="white",
@@ -572,14 +572,7 @@ class JanelaPrincipal(tk.Tk):
             )
             return
 
-        if (
-            self._barcode_aprovado()
-            and not self._tem_falha_na_tabela()
-            and 0 < self._indice_passo < len(self._receita_ativa.steps)
-        ):
-            self._executar_lote_serial()
-            return
-
+        self._parar_aguardar_bimanual()
         self._indice_passo = 0
         self._serial_atual = ""
         self._var_enviado.set("")
@@ -712,7 +705,33 @@ class JanelaPrincipal(tk.Tk):
         self._indice_passo += 1
         self.after(0, self._executar_passo)
 
+    # ── Bimanual ──────────────────────────────────────────────────────────────
+
+    def _aguardar_bimanual(self) -> None:
+        """Ativa o listener serial e aguarda o sinal 'start' do bimanual."""
+        serial_port._on_entrada = self._ao_receber_entrada_serial
+        self._label_alerta.config(text="Aguardando bimanual...")
+
+    def _parar_aguardar_bimanual(self) -> None:
+        serial_port._on_entrada = None
+
+    def _ao_receber_entrada_serial(self, linha: str) -> None:
+        """Chamado pelo thread de leitura serial — agenda no thread principal."""
+        if linha.strip().lower() == "start":
+            self.after(0, self._ao_receber_start)
+
+    def _ao_receber_start(self) -> None:
+        """Recebeu 'start' do bimanual: inicia os testes."""
+        self._parar_aguardar_bimanual()
+        self.botao_iniciar.config(state="disabled")
+        self._atualizar_log("", "start", alerta="Iniciando testes")
+        self._executar_lote_serial()
+
+    # ── Finalização ───────────────────────────────────────────────────────────
+
     def _finalizar_lote(self) -> None:
+        self._parar_aguardar_bimanual()
+        self.botao_iniciar.config(state="normal")
         self._salvar_log()
         if self._tem_falha_apos_barcode():
             threading.Thread(target=self._desligar_placa_bg, daemon=True).start()
@@ -729,6 +748,7 @@ class JanelaPrincipal(tk.Tk):
         if status == t.STATUS_PASS:
             self._serial_atual = codigo
             self._indice_passo = 1
+            self._aguardar_bimanual()
             return
         mostrar_mensagem(
             self,

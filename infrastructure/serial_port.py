@@ -11,6 +11,7 @@ _conexao: serial.Serial | None = None
 _fila: queue.Queue = queue.Queue()
 _lendo = False
 _on_log = None
+_on_entrada = None  # callback(linha: str) — chamado para cada linha recebida
 
 
 def log(enviado: str = "", recebido: str = "", alerta: str = "") -> None:
@@ -24,6 +25,11 @@ def _loop_leitura() -> None:
             linha = _conexao.readline().decode(errors="replace").strip()
             if linha and linha != "0":
                 _fila.put(linha)
+                if _on_entrada:
+                    try:
+                        _on_entrada(linha)
+                    except Exception:
+                        pass
         except Exception:
             break
 

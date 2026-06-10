@@ -19,8 +19,6 @@ def executar(step: Step) -> dict:
     elif cmd == "4":
         log("4", "pop-up aberto")
         return {"nome": step.name, "resposta": "", "resultado": "Pass"}
-    elif cmd == "start":
-        log("teste iniciado")
     else:
         return {"nome": step.name, "resposta": "Erro: comando desconhecido", "resultado": "Fail"}
 
