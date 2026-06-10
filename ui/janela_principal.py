@@ -702,6 +702,8 @@ class JanelaPrincipal(tk.Tk):
         if status == t.STATUS_FAIL:
             self._finalizar_lote()
             return
+        if passo.command.strip() == "2":
+            self._label_alerta.config(text="Desligando Placa", fg=t.COR_VERMELHO)
         self._indice_passo += 1
         self.after(0, self._executar_passo)
 
@@ -724,7 +726,9 @@ class JanelaPrincipal(tk.Tk):
         """Recebeu 'start' do bimanual: inicia os testes."""
         self._parar_aguardar_bimanual()
         self.botao_iniciar.config(state="disabled")
-        self._atualizar_log("", "BIMANUAL_ON", alerta="Iniciando testes")
+        self._atualizar_log("", "BIMANUAL_ON")
+        self._label_alerta.config(text="Iniciando testes", fg=t.COR_VERDE)
+        self.after(1500, lambda: self._label_alerta.config(text="", fg=t.COR_VERMELHO))
         self._executar_lote_serial()
 
     # ── Finalização ───────────────────────────────────────────────────────────
