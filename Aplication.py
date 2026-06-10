@@ -48,6 +48,7 @@ class AplicacaoFCTDelta:
         if self._esta_aberta(self._janela_receita):
             self._janela_receita.lift()
             self._janela_receita.focus_force()
+            self._janela_receita.after(50, self._janela_receita.focar_entrada_inicial)
             return
         self._janela_receita = JanelaReceita(self, nome_editar=nome_editar)
 

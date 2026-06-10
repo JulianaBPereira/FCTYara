@@ -26,6 +26,7 @@ class JanelaReceita(tk.Toplevel):
         self.configure(bg=t.COR_BRANCO)
         aplicar_icone(self)
 
+        self.transient(aplicacao.raiz)
         self._montar_interface()
         centralizar_janela(self, aplicacao.raiz)
         self.protocol("WM_DELETE_WINDOW", self._fechar_janela)
@@ -33,6 +34,8 @@ class JanelaReceita(tk.Toplevel):
         if nome_editar:
             self.campo_titulo.insert(0, nome_editar)
             self.campo_titulo.select_range(0, "end")
+
+        self.after(150, self.focar_entrada_inicial)
 
     # ── Montagem ──────────────────────────────────────────────────────────────
 
@@ -95,6 +98,23 @@ class JanelaReceita(tk.Toplevel):
             fg=t.COR_AZUL_MARINHO,
         )
         self.campo_titulo.pack(fill="x", padx=10, pady=8)
+        self._habilitar_toque_entrada(self.campo_titulo, borda)
+
+    def focar_entrada_inicial(self) -> None:
+        self.lift()
+        self.attributes("-topmost", True)
+        self.after(100, lambda: self.attributes("-topmost", False))
+        self.focus_force()
+        self.campo_titulo.focus_force()
+
+    @staticmethod
+    def _habilitar_toque_entrada(entry: tk.Entry, *containers: tk.Widget) -> None:
+        def focar(_event=None):
+            entry.focus_force()
+
+        for widget in (entry, *containers):
+            widget.bind("<Button-1>", focar, add="+")
+            widget.bind("<ButtonRelease-1>", focar, add="+")
 
     def btn_adicionar(self, parent):
         tk.Button(
@@ -184,7 +204,12 @@ class JanelaReceita(tk.Toplevel):
         frame_scroll = tk.Frame(container, bg=t.COR_BRANCO)
         frame_scroll.pack(fill="both", expand=True)
 
-        self.canvas = tk.Canvas(frame_scroll, bg=t.COR_BRANCO, highlightthickness=0)
+        self.canvas = tk.Canvas(
+            frame_scroll,
+            bg=t.COR_BRANCO,
+            highlightthickness=0,
+            takefocus=0,
+        )
         self.canvas.pack(side="left", fill="both", expand=True)
 
         sb = ttk.Scrollbar(frame_scroll, orient="vertical", command=self.canvas.yview)
@@ -192,10 +217,18 @@ class JanelaReceita(tk.Toplevel):
         self.canvas.configure(yscrollcommand=sb.set)
 
         self.container_linhas = tk.Frame(self.canvas, bg=t.COR_BRANCO)
-        self.canvas.create_window((0, 0), window=self.container_linhas, anchor="nw")
+        self._janela_canvas = self.canvas.create_window(
+            (0, 0), window=self.container_linhas, anchor="nw",
+        )
 
-        self.container_linhas.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(1, width=e.width))
+        self.container_linhas.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self.canvas.itemconfig(self._janela_canvas, width=e.width),
+        )
 
     def combo_box(self, parent, valor="", on_focus=None, linha_ref=None):
         estilo = ttk.Style()
@@ -246,6 +279,7 @@ class JanelaReceita(tk.Toplevel):
             entry.insert(0, valor)
         entry.bind("<FocusIn>", lambda e: (on_focus and on_focus(), linha_ref and linha_ref.configure(bg=t.COR_AZUL_MARINHO)))
         entry.bind("<FocusOut>", lambda e: linha_ref and linha_ref.configure(bg=t.COR_CINZA_CLARO))
+        self._habilitar_toque_entrada(entry, frame)
         return frame, entry
 
     # ── Lógica ────────────────────────────────────────────────────────────────
