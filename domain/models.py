@@ -9,7 +9,7 @@ class Step:
     name: str
     type: str
     command: str = ""
-    expectedValue: str = ""
+    expectedValue: str | list[str] = ""
 
     # receita
 @dataclass

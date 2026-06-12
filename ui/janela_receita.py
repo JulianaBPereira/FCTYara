@@ -12,6 +12,11 @@ from ui.Avisos.mensagem import mostrar as mostrar_mensagem
 class JanelaReceita(tk.Toplevel):
     """Janela para criar receitas de teste."""
 
+    _COL_NOME = 180
+    _COL_TIPO = 120
+    _COL_COMANDO = 100
+    _COL_VALOR = 480
+
     def __init__(self, aplicacao, nome_editar=None):
         super().__init__(aplicacao.raiz)
         self.aplicacao = aplicacao
@@ -19,6 +24,7 @@ class JanelaReceita(tk.Toplevel):
         self.linhas = []
         self.linha_selecionada = None
         self._entrada_ativa: tk.Entry | None = None
+        self._scroll_h_entry: tk.Entry | None = None
 
         self.title("Criar Receita")
         self.geometry(GEOMETRIA_PADRAO)
@@ -188,7 +194,7 @@ class JanelaReceita(tk.Toplevel):
             pass
 
     def _habilitar_toque_entrada(self, entry: tk.Entry, *containers: tk.Widget) -> None:
-        def focar(_event=None):
+        def focar_toque(_event=None):
             def _fazer():
                 self._focar_entrada(entry)
                 self._rolar_para_entry(entry)
@@ -199,8 +205,9 @@ class JanelaReceita(tk.Toplevel):
             lambda _e, campo=entry: setattr(self, "_entrada_ativa", campo),
             add="+",
         )
-        for widget in (entry, *containers):
-            widget.bind("<ButtonRelease-1>", focar, add="+")
+        # Só no frame ao redor — clique direto no Entry mantém posição do cursor
+        for widget in containers:
+            widget.bind("<ButtonRelease-1>", focar_toque, add="+")
 
     def _encaminhar_tecla(self, event: tk.Event):
         """No Raspberry o teclado virtual às vezes envia teclas para a janela, não para o Entry."""
@@ -300,27 +307,99 @@ class JanelaReceita(tk.Toplevel):
             command=self._fechar_janela,
         ).pack(side="right", padx=(6, 0))
 
+    def _config_colunas_grid(self, frame: tk.Frame) -> None:
+        frame.grid_columnconfigure(0, minsize=self._COL_NOME, weight=0)
+        frame.grid_columnconfigure(1, minsize=self._COL_TIPO, weight=0)
+        frame.grid_columnconfigure(2, minsize=self._COL_COMANDO, weight=0)
+        frame.grid_columnconfigure(3, minsize=self._COL_VALOR, weight=0)
+
+    def _atualizar_scroll_tabela_h(self, event=None) -> None:
+        if not hasattr(self, "_canvas_tabela_h"):
+            return
+        self._canvas_tabela_h.update_idletasks()
+        if event is not None:
+            self._canvas_tabela_h.configure(
+                scrollregion=(0, 0, event.width, event.height),
+                height=event.height,
+            )
+            return
+        bbox = self._canvas_tabela_h.bbox("all")
+        if bbox:
+            self._canvas_tabela_h.configure(scrollregion=bbox, height=bbox[3])
+
+    def _scroll_h_command(self, *args) -> None:
+        if self._scroll_h_entry is not None:
+            self._scroll_h_entry.xview(*args)
+        else:
+            self._canvas_tabela_h.xview(*args)
+
+    def _usar_scroll_h_tabela(self) -> None:
+        self._scroll_h_entry = None
+        if not hasattr(self, "_sb_h"):
+            return
+        self._sb_h.configure(command=self._scroll_h_command)
+        self._canvas_tabela_h.configure(xscrollcommand=self._sb_h.set)
+
+    def _usar_scroll_h_entry(self, entry: tk.Entry) -> None:
+        self._scroll_h_entry = entry
+        self._sb_h.configure(command=self._scroll_h_command)
+        entry.configure(xscrollcommand=self._sb_h.set)
+
+    def _ao_rolar_tabela_h(self, event):
+        delta = int(-event.delta / 120) if event.delta else 0
+        if event.num == 4:
+            delta = -1
+        elif event.num == 5:
+            delta = 1
+        if self._scroll_h_entry is not None:
+            self._scroll_h_entry.xview_scroll(delta, "units")
+        else:
+            self._canvas_tabela_h.xview_scroll(delta, "units")
+        return "break"
+
     def tabela_testes(self, parent):
         container = tk.Frame(parent, bg=t.COR_BRANCO)
-        container.pack(fill="both", expand=True, pady=(0, 8))
+        container.pack(fill="x", pady=(0, 8))
 
-        # Cabeçalho
-        cab = tk.Frame(container, bg=t.COR_BRANCO)
+        self._canvas_tabela_h = tk.Canvas(
+            container, bg=t.COR_BRANCO, highlightthickness=0,
+        )
+        self._sb_h = ttk.Scrollbar(
+            container, orient="horizontal", command=self._scroll_h_command,
+        )
+        self._sb_h.pack(fill="x")
+        self._canvas_tabela_h.pack(fill="x")
+        self._canvas_tabela_h.configure(xscrollcommand=self._sb_h.set)
+
+        inner = tk.Frame(self._canvas_tabela_h, bg=t.COR_BRANCO)
+        self._id_tabela_h = self._canvas_tabela_h.create_window(
+            (0, 0), window=inner, anchor="nw",
+        )
+
+        inner.bind("<Configure>", self._atualizar_scroll_tabela_h)
+        for widget in (self._canvas_tabela_h, inner, container):
+            widget.bind("<Shift-MouseWheel>", self._ao_rolar_tabela_h)
+            widget.bind("<Shift-Button-4>", self._ao_rolar_tabela_h)
+            widget.bind("<Shift-Button-5>", self._ao_rolar_tabela_h)
+
+        cab = tk.Frame(inner, bg=t.COR_BRANCO)
         cab.pack(fill="x")
-        for texto in ("NOME DO TESTE", "TIPO", "COMANDO", "VALOR ESPERADO"):
+        self._config_colunas_grid(cab)
+        for col, texto in enumerate(
+            ("NOME DO TESTE", "TIPO", "COMANDO", "VALOR ESPERADO")
+        ):
             tk.Label(
                 cab,
                 text=texto,
                 font=t.FONTE_BOLD,
                 bg=t.COR_BRANCO,
                 fg=t.COR_PRIMARIA,
-            ).pack(side="left", expand=True, padx=4, pady=8)
+            ).grid(row=0, column=col, sticky="ew", padx=4, pady=8)
 
-        tk.Frame(container, bg=t.COR_PRIMARIA, height=1).pack(fill="x", pady=(0, 8))
+        tk.Frame(inner, bg=t.COR_PRIMARIA, height=1).pack(fill="x", pady=(0, 8))
 
-        # Linhas diretamente no frame (sem Canvas interno — o scroll principal cobre tudo)
-        self.container_linhas = tk.Frame(container, bg=t.COR_BRANCO)
-        self.container_linhas.pack(fill="both", expand=True)
+        self.container_linhas = tk.Frame(inner, bg=t.COR_BRANCO)
+        self.container_linhas.pack(fill="x")
 
         self._registrar_captura_teclado(self.container_linhas)
 
@@ -369,20 +448,65 @@ class JanelaReceita(tk.Toplevel):
         cb.bind("<FocusOut>", lambda e: linha_ref and linha_ref.configure(bg=t.COR_CINZA_CLARO))
         return frame, cb
 
-    def _campo_texto(self, parent, valor="", on_focus=None, linha_ref=None):
+    def _bind_scroll_valor(self, entry: tk.Entry, on_focus=None, linha_ref=None) -> None:
+        def focar(_event=None):
+            if on_focus:
+                on_focus()
+            if linha_ref:
+                linha_ref.configure(bg=t.COR_AZUL_MARINHO)
+            self._usar_scroll_h_entry(entry)
+
+        def desfocar(_event=None):
+            if linha_ref:
+                linha_ref.configure(bg=t.COR_CINZA_CLARO)
+            novo_foco = self.focus_get()
+            if novo_foco is not entry:
+                self.after_idle(self._usar_scroll_h_tabela)
+
+        def ir_inicio(_event=None):
+            entry.icursor(0)
+            entry.xview_moveto(0)
+            return "break"
+
+        def ir_fim(_event=None):
+            entry.icursor(tk.END)
+            entry.xview_moveto(1)
+            return "break"
+
+        entry.bind("<FocusIn>", focar, add="+")
+        entry.bind("<FocusOut>", desfocar, add="+")
+        entry.bind("<Home>", ir_inicio)
+        entry.bind("<Control-Home>", ir_inicio)
+        entry.bind("<End>", ir_fim)
+        entry.bind("<Control-End>", ir_fim)
+        entry.bind("<Shift-MouseWheel>", self._ao_rolar_tabela_h)
+        entry.bind("<Shift-Button-4>", self._ao_rolar_tabela_h)
+        entry.bind("<Shift-Button-5>", self._ao_rolar_tabela_h)
+
+    def _campo_texto(
+        self,
+        parent,
+        valor="",
+        on_focus=None,
+        linha_ref=None,
+        scroll_horizontal=False,
+    ):
         frame = tk.Frame(parent, bg=t.COR_BRANCO)
         entry = tk.Entry(
             frame, font=t.FONTE_NORMAL, relief="flat", bd=0,
             highlightthickness=0,
             exportselection=False,
             bg=t.COR_BRANCO, fg=t.COR_AZUL_MARINHO, insertbackground=t.COR_AZUL_MARINHO,
-            justify="center",
+            justify="left" if scroll_horizontal else "center",
         )
         entry.pack(fill="x", ipady=8)
         if valor:
             entry.insert(0, valor)
-        entry.bind("<FocusIn>", lambda e: (on_focus and on_focus(), linha_ref and linha_ref.configure(bg=t.COR_AZUL_MARINHO)))
-        entry.bind("<FocusOut>", lambda e: linha_ref and linha_ref.configure(bg=t.COR_CINZA_CLARO))
+        if scroll_horizontal:
+            self._bind_scroll_valor(entry, on_focus=on_focus, linha_ref=linha_ref)
+        else:
+            entry.bind("<FocusIn>", lambda e: (on_focus and on_focus(), linha_ref and linha_ref.configure(bg=t.COR_AZUL_MARINHO)))
+            entry.bind("<FocusOut>", lambda e: linha_ref and linha_ref.configure(bg=t.COR_CINZA_CLARO))
         self._habilitar_toque_entrada(entry, frame)
         return frame, entry
 
@@ -410,6 +534,7 @@ class JanelaReceita(tk.Toplevel):
 
         conteudo = tk.Frame(linha_frame, bg=t.COR_BRANCO)
         conteudo.pack(fill="x")
+        self._config_colunas_grid(conteudo)
 
         selecionar = lambda: self._selecionar_linha(dados)
 
@@ -419,22 +544,26 @@ class JanelaReceita(tk.Toplevel):
         frame_nome, entry_nome = self._campo_texto(
             conteudo, nome, on_focus=selecionar, linha_ref=linha_ativa,
         )
-        frame_nome.pack(side="left", expand=True, fill="x", padx=4)
+        frame_nome.grid(row=0, column=0, sticky="ew", padx=4)
 
         frame_tipo, combo_tipo = self.combo_box(
             conteudo, tipo, on_focus=selecionar, linha_ref=linha_ativa,
         )
-        frame_tipo.pack(side="left", expand=True, fill="x", padx=4)
+        frame_tipo.grid(row=0, column=1, sticky="ew", padx=4)
 
         frame_comando, entry_comando = self._campo_texto(
             conteudo, comando_val, on_focus=selecionar, linha_ref=linha_ativa,
         )
-        frame_comando.pack(side="left", expand=True, fill="x", padx=4)
+        frame_comando.grid(row=0, column=2, sticky="ew", padx=4)
 
         frame_valor, entry_valor = self._campo_texto(
-            conteudo, ValorEsperado_val, on_focus=selecionar, linha_ref=linha_ativa,
+            conteudo,
+            ValorEsperado_val,
+            on_focus=selecionar,
+            linha_ref=linha_ativa,
+            scroll_horizontal=True,
         )
-        frame_valor.pack(side="left", expand=True, fill="x", padx=4)
+        frame_valor.grid(row=0, column=3, sticky="ew", padx=4)
 
         combo_tipo.bind(
             "<<ComboboxSelected>>",
@@ -451,11 +580,12 @@ class JanelaReceita(tk.Toplevel):
         })
         self.linhas.append(dados)
 
-        # Atualiza o scroll do canvas principal
+        # Atualiza o scroll do canvas principal e da tabela horizontal
         self._painel.update_idletasks()
         self._canvas_principal.configure(
             scrollregion=self._canvas_principal.bbox("all")
         )
+        self._atualizar_scroll_tabela_h()
 
     def _selecionar_linha(self, dados):
         self.linha_selecionada = dados
@@ -469,6 +599,7 @@ class JanelaReceita(tk.Toplevel):
         self._canvas_principal.configure(
             scrollregion=self._canvas_principal.bbox("all")
         )
+        self._atualizar_scroll_tabela_h()
 
     def _fechar_janela(self):
         try:
@@ -489,7 +620,12 @@ class JanelaReceita(tk.Toplevel):
         self._canvas_principal.configure(
             scrollregion=self._canvas_principal.bbox("all")
         )
+        self._atualizar_scroll_tabela_h()
         self._focar_entrada(self.campo_titulo)
+
+    @staticmethod
+    def _parsear_codigos(texto: str) -> list[str]:
+        return [c.strip() for c in texto.split(",") if c.strip()]
 
     def _coletar_passos(self) -> list[Step]:
         passos = []
@@ -502,10 +638,19 @@ class JanelaReceita(tk.Toplevel):
                 else ""
             )
             valor = linha["entry_valor"].get().strip()
+            if tipo == "Code":
+                expected_value: str | list[str] = self._parsear_codigos(valor)
+            else:
+                expected_value = valor
             if not nome and not tipo and not comando and not valor:
                 continue
             passos.append(
-                Step(name=nome, type=tipo, command=comando, expectedValue=valor)
+                Step(
+                    name=nome,
+                    type=tipo,
+                    command=comando,
+                    expectedValue=expected_value,
+                )
             )
         return passos
 
@@ -519,6 +664,14 @@ class JanelaReceita(tk.Toplevel):
                     return f'Comando inválido no passo "{passo.name}": use 1, 2 ou 3.'
             elif passo.type == "Pop-up" and cmd and cmd != "4":
                 return f'Comando inválido no passo "{passo.name}": use 4 para acionar o display.'
+            elif passo.type == "Code":
+                codes = (
+                    passo.expectedValue
+                    if isinstance(passo.expectedValue, list)
+                    else []
+                )
+                if not codes:
+                    return f'Informe ao menos um código no passo "{passo.name}".'
         return None
 
     def _salvar_receita(self):

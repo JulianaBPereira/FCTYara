@@ -9,7 +9,11 @@ class BarcodeService:
     def __init__(self, code: str):
         self.code = code.strip()
 
-    def CompararBarcode(self, expectedValue: str) -> str:
-        if self.code == expectedValue.strip():
+    def CompararBarcode(self, expectedValue: str | list[str]) -> str:
+        if isinstance(expectedValue, list):
+            validos = {c.strip() for c in expectedValue if c.strip()}
+        else:
+            validos = {expectedValue.strip()} if expectedValue.strip() else set()
+        if self.code in validos:
             return "PASS"
         return "FAIL"

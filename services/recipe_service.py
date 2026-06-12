@@ -106,7 +106,19 @@ def carregar_passos(titulo: str) -> list[Step] | None:
         if not isinstance(item, dict):
             continue
         try:
-            passos.append(Step(**item))
+            raw_val = item.get("expectedValue", "")
+            if isinstance(raw_val, list):
+                expected_value: str | list[str] = [
+                    str(c).strip() for c in raw_val if str(c).strip()
+                ]
+            else:
+                expected_value = str(raw_val) if raw_val is not None else ""
+            passos.append(Step(
+                name=item.get("name", ""),
+                type=item.get("type", ""),
+                command=item.get("command", ""),
+                expectedValue=expected_value,
+            ))
         except TypeError as e:
             print(f"[FCTDelta] Passo {i + 1} ignorado em {arquivo.name}: {e}", file=sys.stderr)
 

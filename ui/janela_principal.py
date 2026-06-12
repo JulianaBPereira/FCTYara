@@ -37,8 +37,20 @@ class JanelaPrincipal(tk.Tk):
     """
 
     # Colunas da tabela na ordem em que aparecem
-    COLUNAS = ("TESTE", "RANGE", "VALOR", "STATUS")
+    COLUNAS = t.COLUNAS_TABELA_PRINCIPAL
     _COOLDOWN_APOS_TESTE_MS = 4000
+    _MIN_LARGURA_COLUNAS = {
+        "TESTE": 120,
+        "RANGE": 100,
+        "VALOR": 90,
+        "STATUS": 90,
+    }
+    _PROPORCOES_COLUNAS = {
+        "TESTE": t.COL_TESTE,
+        "RANGE": t.COL_RANGE,
+        "VALOR": t.COL_VALOR,
+        "STATUS": t.COL_STATUS,
+    }
 
     def __init__(self, aplicacao):
         super().__init__()
@@ -62,6 +74,7 @@ class JanelaPrincipal(tk.Tk):
         self._fila_passos: queue.Queue[tuple[Step, dict]] = queue.Queue()
         self._finalizar_after_id: str | None = None
         self._aguardando_proximo = False
+        self._foco_barcode_after_id: str | None = None
 
         self._montar_interface()
         self.after(100, self._processar_eventos_bg)
@@ -92,6 +105,7 @@ class JanelaPrincipal(tk.Tk):
         self._montar_campo_barcode(painel)
         self._montar_tabela(painel)
         self._montar_log_serial(painel)
+        self._vincular_autofoco_barcode()
         self.after(50, self._focar_campo_barcode)
 
     # ── 1. Linha de estado ────────────────────────────────────────────────────
@@ -151,10 +165,18 @@ class JanelaPrincipal(tk.Tk):
         self._bolinha_ligada = True
         self._canvas_bolinha.itemconfig(self._bolinha_id, fill=cor)
 
+    def _texto_valor_esperado(self, passo: Step) -> str:
+        val = passo.expectedValue
+        if isinstance(val, list):
+            return ", ".join(val)
+        return (val or "").strip()
+
     def _range_coluna(self, passo: Step) -> str:
         if passo.type == "Pop-up":
             return "Pop-up"
-        return passo.expectedValue
+        if passo.type == "Code":
+            return "Codes"
+        return self._texto_valor_esperado(passo)
 
     def aplicar_configuracao(self, porta: str, baud: int, receita: str) -> None:
         threading.Thread(
@@ -220,15 +242,20 @@ class JanelaPrincipal(tk.Tk):
             frame,
             columns=self.COLUNAS,
             show="headings",
-            selectmode="browse",
+            selectmode="none",
+            takefocus=False,
         )
 
-        larguras = {"TESTE": 240, "RANGE": 160, "VALOR": 160, "STATUS": 140}
         for col in self.COLUNAS:
-            ancora = "w" if col == "TESTE" else "center"
+            ancora = "w" if col in ("TESTE", "RANGE") else "center"
             self.tabela.heading(col, text=col, anchor=ancora)
-            self.tabela.column(col, anchor=ancora, stretch=True, minwidth=60,
-                               width=larguras[col])
+            self.tabela.column(
+                col,
+                anchor=ancora,
+                stretch=False,
+                minwidth=self._MIN_LARGURA_COLUNAS[col],
+                width=self._MIN_LARGURA_COLUNAS[col],
+            )
 
         self._sv = tk.Canvas(
             frame, width=self._SCROLL_W,
@@ -242,8 +269,8 @@ class JanelaPrincipal(tk.Tk):
 
         self.tabela.configure(yscrollcommand=self._sv_on_move)
         self.tabela.bind("<MouseWheel>", self._on_mousewheel)
-        self.tabela.bind("<Configure>", lambda _e: self.after_idle(self._posicionar_labels_status))
-        self.tabela.bind("<<TreeviewSelect>>", lambda _e: self._posicionar_labels_status())
+        self.tabela.bind("<Configure>", self._ao_redimensionar_tabela)
+        self.tabela.bind("<ButtonPress-1>", self._ao_clicar_tabela)
 
         self._sv.bind("<ButtonPress-1>", self._sv_click)
         self._sv.bind("<B1-Motion>", self._sv_drag)
@@ -255,6 +282,44 @@ class JanelaPrincipal(tk.Tk):
         self.tabela.grid(row=0, column=0, sticky="nsew")
         self._sv.grid(row=0, column=1, sticky="ns", padx=(4, 0))
         self.after_idle(self._sv_redraw)
+        self.after_idle(self._ajustar_larguras_colunas)
+
+    def _ao_redimensionar_tabela(self, _event=None) -> None:
+        self.after_idle(self._ajustar_larguras_colunas)
+        self.after_idle(self._posicionar_labels_status)
+
+    def _ao_clicar_tabela(self, _event=None) -> str:
+        self._focar_campo_barcode()
+        return "break"
+
+    def _ajustar_larguras_colunas(self) -> None:
+        if not self.winfo_exists():
+            return
+        largura_total = self.tabela.winfo_width()
+        if largura_total <= 1:
+            return
+
+        largura_util = largura_total - 2
+        larguras = [
+            max(self._MIN_LARGURA_COLUNAS[col], int(largura_util * self._PROPORCOES_COLUNAS[col]))
+            for col in self.COLUNAS
+        ]
+        ordem = sorted(
+            range(len(self.COLUNAS)),
+            key=lambda i: self._PROPORCOES_COLUNAS[self.COLUNAS[i]],
+            reverse=True,
+        )
+
+        diferenca = largura_util - sum(larguras)
+        for i in range(abs(diferenca)):
+            pos = ordem[i % len(ordem)]
+            if diferenca > 0:
+                larguras[pos] += 1
+            elif larguras[pos] > self._MIN_LARGURA_COLUNAS[self.COLUNAS[pos]]:
+                larguras[pos] -= 1
+
+        for col, largura in zip(self.COLUNAS, larguras, strict=True):
+            self.tabela.column(col, width=largura)
 
     def _criar_label_status(self) -> tk.Label:
         return tk.Label(
@@ -397,6 +462,7 @@ class JanelaPrincipal(tk.Tk):
             ))
             self._ids_linhas_tabela.append(item_id)
             self._labels_status.append(self._criar_label_status())
+        self.after_idle(self._ajustar_larguras_colunas)
         self.after_idle(self._posicionar_labels_status)
 
     # ── Scrollbar customizada ─────────────────────────────────────────────────
@@ -522,13 +588,56 @@ class JanelaPrincipal(tk.Tk):
             fg=t.COR_AZUL_MARINHO,
         ).grid(row=0, column=1, sticky="e")
 
+    def _vincular_autofoco_barcode(self) -> None:
+        self.bind("<FocusIn>", self._ao_janela_receber_foco, add="+")
+        self.bind("<Map>", self._ao_janela_receber_foco, add="+")
+
+    def _campo_barcode_esta_habilitado(self) -> bool:
+        try:
+            return str(self._campo_barcode.cget("state")) != "disabled"
+        except tk.TclError:
+            return False
+
+    def _agendar_foco_barcode(self) -> None:
+        if self._foco_barcode_after_id is not None:
+            try:
+                self.after_cancel(self._foco_barcode_after_id)
+            except ValueError:
+                pass
+        self._foco_barcode_after_id = self.after(50, self._executar_foco_barcode_agendado)
+
+    def _executar_foco_barcode_agendado(self) -> None:
+        self._foco_barcode_after_id = None
+        self._restaurar_foco_barcode_se_aplicavel()
+
+    def _ao_janela_receber_foco(self, event=None) -> None:
+        if event and hasattr(event, "widget") and event.widget is not self:
+            return
+        self._agendar_foco_barcode()
+
+    def _restaurar_foco_barcode_se_aplicavel(self) -> None:
+        if not self.winfo_exists():
+            return
+        if not self._campo_barcode_esta_habilitado():
+            return
+        try:
+            grab = self.grab_current()
+        except (KeyError, tk.TclError):
+            return
+        if grab is not None and grab is not self and grab is not self._campo_barcode:
+            return
+        foco = self.focus_get()
+        if foco is not None:
+            if foco.winfo_toplevel() is not self:
+                return
+            if foco is self._campo_barcode:
+                return
+        self._focar_campo_barcode()
+
     def _focar_campo_barcode(self) -> None:
         if not self.winfo_exists():
             return
-        try:
-            if str(self._campo_barcode.cget("state")) == "disabled":
-                return
-        except tk.TclError:
+        if not self._campo_barcode_esta_habilitado():
             return
         self._campo_barcode.focus_set()
         self._ao_focar_campo_barcode()
@@ -776,7 +885,7 @@ class JanelaPrincipal(tk.Tk):
         self.after(0, self._executar_passo)
 
     def _executar_passo_popup(self, passo: Step) -> None:
-        valor = (passo.expectedValue or "").strip()
+        valor = self._texto_valor_esperado(passo)
         aprovado = perguntar_popup(self, "", valor)
         status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
         self._atualizar_linha_teste(
@@ -796,7 +905,7 @@ class JanelaPrincipal(tk.Tk):
 
     def _passo_comando_concluido(self, passo: Step, resultado: dict) -> None:
         if resultado["resultado"] == "Pop-up":
-            valor = (passo.expectedValue or "").strip()
+            valor = self._texto_valor_esperado(passo)
             aprovado = perguntar_popup(self, "", valor)
             status = t.STATUS_PASS if aprovado else t.STATUS_FAIL
             self._atualizar_linha_teste(

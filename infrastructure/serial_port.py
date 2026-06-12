@@ -32,12 +32,12 @@ def drenar_logs() -> list[tuple[str, str, str]]:
 
 def iniciar_escuta_entrada() -> None:
     global _escutando_entrada
-    _escutando_entrada = True
     try:
         while True:
             _fila_entrada.get_nowait()
     except queue.Empty:
         pass
+    _escutando_entrada = True
 
 
 def parar_escuta_entrada() -> None:
@@ -71,7 +71,9 @@ def _loop_leitura() -> None:
                 if _escutando_entrada:
                     _fila_entrada.put(linha)
         except Exception:
-            break
+            if not (_conexao and _conexao.is_open):
+                break
+            continue
 
 
 def listar_portas() -> list[str]:
