@@ -205,6 +205,8 @@ class JanelaPrincipal(tk.Tk):
         receita_obj: Recipe | None,
     ) -> None:
         self._definir_status(conectado, porta, baud, receita)
+        if conectado:
+            threading.Thread(target=self._desligar_placa_bg, daemon=True).start()
         if receita_obj is None:
             self._receita_ativa = None
             return
